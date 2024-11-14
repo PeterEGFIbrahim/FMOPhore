@@ -1,4 +1,4 @@
-name: FMO_JCPE
+name: FMOPhore
 channels:
   - openeye
   - tmap
