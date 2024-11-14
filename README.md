@@ -35,8 +35,8 @@ Note: Make sure the system is an output from Schrodniger software preparation st
 
 # Conda Environment installation
 	conda activate
-	conda env create -f environment.yml
-	conda activate FraGrow
+	conda env create -f FMOPhore_env.yml
+	conda activate FMOPhore_env
 
 # Default to run on the gpu-s directly
 
