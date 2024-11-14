@@ -1,4 +1,4 @@
-name: FMOPhore
+name: FMOPhore_env
 channels:
   - openeye
   - tmap
