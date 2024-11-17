@@ -1,7 +1,5 @@
 # FMOPhore
 
-# Copyright "©" Developer: Peter E. G. F. Ibrahim.
-
 #####################################################################
 
 •	Full automation software for fragment hit to lead growth and optimization: 
@@ -82,3 +80,4 @@ Peter E.G.F. Ibrahim.
 	qsub FraGrow.sh 
 
 #####################################################################
+Copyright "©" Developer: Peter E. G. F. Ibrahim.
