@@ -1,6 +1,6 @@
 # FMOPhore
 
-![Uploading image.png…]()
+<img width="459" alt="image" src="https://github.com/user-attachments/assets/4a3fbc8c-fd40-4b96-a621-dd14d669c0a3">
 
 
 #####################################################################
