@@ -10,7 +10,7 @@
 	conda env create -f FMOPhore_env.yml
 	conda activate FMOPhore_env
 
-# Default to run
+# Default to run FP-score equation:
 
 	python FP_score_cal_plot.py
 
