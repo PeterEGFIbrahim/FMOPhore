@@ -1,33 +1,7 @@
 # FMOPhore
 
-#####################################################################
+![Uploading image.png…]()
 
-•	Full automation software for fragment hit to lead growth and optimization: 
-
-System preparation step:
-	o	Preparation, fragmentation. 
-	o	Automated Multichain pdbs processing.
-	o	Automated alignment of complexes for complete library of molecules or snapshots during MD for DA-QM-FMO processing.
-
-QM-DA-FMO/ QM-FMO calculation steps:
-	o	Calculating ligand-protein binding interaction energies.
-	o	Calculating ligand energy, protein energy and protein-ligand complex energy (full system).
-	o	Binding Energy = (E complex) – (E protein) – (E ligand).
-	o	Preforming Dynamical-averaging-FMO (DA-FMO) on a full Molecular dynamics trajectory of ligand-protein complex.
-	o	QM-FMO calculations (DFTB-MP2) on protein, ligand and complex separate.
-
-Binding site and hotspots indentificaiton steps:
-	o	Descriptors generation. 
-	o	Binding site and hotspot identification.
-
-Pharmacophores and growth vectors steps:
-	o	Holo-pharmacophore generation.
-	o	Growth vectors prediction (Holo and Apo growth vectors). 
-
-Analysis and plots generation step:
-	o	Giving full details about the ligands 3D coordinates in the binding site, with the distances and angles of binding interaction, bond types (HB, hydrophobic, ionic, Pi-Pi stacking …etc) and interaction energies, binding energy, and deltaG, plots PEIDA and heatmaps.
-
-Note: Make sure the system is an output from Schrodniger software preparation step. 
 
 #####################################################################
 
