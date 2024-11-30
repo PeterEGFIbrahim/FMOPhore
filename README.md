@@ -1,4 +1,4 @@
-# FMOPhore V.0.1
+# FMOPhore V.0.1 Hotspot prediction and classification
 
 # <img width="900" alt="image" align="center" src="https://github.com/user-attachments/assets/4a3fbc8c-fd40-4b96-a621-dd14d669c0a3">
 
