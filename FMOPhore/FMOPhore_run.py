@@ -130,9 +130,9 @@ for pdb_file in pdb_files:
 # Arguments
 ####################################################################################################
 if args.qm_calculation == "DFTB":
-    files_to_copy = ["run_DFTB_personalized.sh", "rungms_personalized", "dogms_personalized"]
+    files_to_copy = ["run_DFTB.sh", "rungms", "DFTB"]
 elif args.qm_calculation == "MP2": 
-    files_to_copy = ["run_MP2_personalized.sh", "rungms_personalized", "launch_gamess_personalized"]
+    files_to_copy = ["run_MP2.sh", "rungms", "MP2"]
 ####################################################################################################
 ############################ To define the PDBs that FMOPhore will work on. #########################
 pdb_files = []
