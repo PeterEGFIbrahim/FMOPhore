@@ -5,9 +5,8 @@
 
 
 ##   System requirments
-- GAMESS software (https://www.msg.chem.iastate.edu/gamess/download.html)
-- SuMD (https://github.com/molecularmodelingsection/SuMD)
-- ACEMD (https://software.acellera.com/acemd/tutorial.html)
+- GAMESS software (https://www.msg.chem.iastate.edu/gamess/download.html) to run QM-FMO calculations.
+- SuMD (https://github.com/molecularmodelingsection/SuMD) and ACEMD (https://software.acellera.com/acemd/tutorial.html) to run Dy-FMOPhore analysis.
 
 ##  Hardware recommended and tested:
 - Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
