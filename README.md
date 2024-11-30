@@ -9,8 +9,6 @@
 - SuMD (https://github.com/molecularmodelingsection/SuMD)
 - ACEMD (https://software.acellera.com/acemd/tutorial.html)
 #####################################################################
-- QM-FMO caluclations are expensive.
-#####################################################################
 <!-- Hardware recommended and tested: -->
 - Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
 - Tested on 2 NVIDIA GTX 1080 per node on 8 GPUs.
