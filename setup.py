@@ -6,7 +6,7 @@ setup(
     author="Peter E.G.F. Ibrahim",
     author_email="2448959@dundee.ac.uk peteregfi@gmail.com",
     description="FMOPhore for hotspot identification and classification",
-    url="https://github.com/PeterEGFIbrahim/FMOPhore", 
+    url="https://github.com/PeterEGFIbrahim/FMOPhore.git", 
     packages=find_packages(),
     install_requires=[
         "numpy",
