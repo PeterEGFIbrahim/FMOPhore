@@ -35,7 +35,7 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 - **PDB Preparation**: Process and prepare PDB files for calculations.
 - **QM Calculations**: Run MP2 or DFTB calculations using GAMESS software.
 - **Binding Energy Calculations**: Calculate the binding energy (ΔE) for protein-ligand complexes.
-- **Trajectory Support**: Analyze trajectories with tools like SuMD and ACEMD.
+- **Trajectory Support**: Perform MD using SuMD and ACEMD, for compatibility with FMOPhore analysis.
 - **Analysis Tools**: Perform post-calculation analysis.
 
 ---
