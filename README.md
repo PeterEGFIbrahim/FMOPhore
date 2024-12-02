@@ -45,7 +45,7 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 ### Prerequisites
 
 - Python >= 3.6
-- GAMESS software (optional, for QM calculations).
+- GAMESS software (for QM calculations).
 
 ### Set up Conda Environment
 
