@@ -65,14 +65,16 @@ To ensure all dependencies are correctly installed and avoid conflicts, follow t
    ```bash
    git clone https://github.com/PeterEGFIbrahim/FMOPhore.git
 
-Navigate to the directory:
+2. Navigate to the directory:
    ```bash
-cd FMOPhore
-
-Install the package:
+   cd FMOPhore
+   
+4. Install the package:
    ```bash
-pip install .
+   pip install .
 
+
+## Usage
 
 ### Mandatory Parameters:
    ```bash
@@ -91,7 +93,7 @@ pip install .
 -t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).
 -c,         --cpus                  : Number of CPUs to use for parallelization.
 
-### Optional Parameters:
+### Optional Parameters
    ```bash
 -DA-FMO,    --trajectory            : Analyze trajectories (requires SuMD and ACEMD).
 -cof,       --cofactor              : Specify co-factor (e.g., `LYS-600`).
