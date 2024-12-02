@@ -144,7 +144,8 @@ GitHub: [PeterEGFIbrahim](https://github.com/PeterEGFIbrahim)
 
 
 ### Licensing
-This project is licensed under the GPL-3.0 License. See the LICENSE file for details.
+- This project is licensed under the GPL-3.0 License.
+- See the LICENSE file for details.
     
 ### Copyright
 © 2024 Peter E.G.F. Ibrahim. All rights reserved.
