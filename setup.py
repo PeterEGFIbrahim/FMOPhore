@@ -4,7 +4,7 @@ setup(
     name="FMOPhore",
     version="0.1",
     author="Peter E.G.F. Ibrahim",
-    author_email="2448959@dundee.ac.uk peteregfi@gmail.com",
+    author_email="2448959@dundee.ac.uk - peteregfi@gmail.com",
     description="FMOPhore for hotspot identification and classification",
     url="https://github.com/PeterEGFIbrahim/FMOPhore.git", 
     packages=find_packages(),
