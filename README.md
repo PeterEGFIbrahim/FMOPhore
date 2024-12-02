@@ -57,7 +57,7 @@ To ensure all dependencies are correctly installed and avoid conflicts, follow t
    ```bash
    conda env create -f FMOPhore_env.yml
    conda activate FMOPhore_env
-
+   ```
 
 ### Steps
 
@@ -73,72 +73,77 @@ To ensure all dependencies are correctly installed and avoid conflicts, follow t
    ```bash
    pip install .
 
-
 ## Usage
 
 ### Mandatory Parameters:
    ```bash
--dir,       --directory             : Process all PDB files in a directory.
--com,       --Prot_complex          : Process a single complex PDB file.
--PDB,       --PDB_ID                : Specify a PDB ID or a file containing multiple PDB IDs.
--prot,      --protein_pdb_file      : Path to the protein PDB file.
--ligs,      --ligand_files          : Path to a single ligand PDB file or a directory of ligand PDB files.
-
--PDBProcessor, --PDBProcessor       : Prepare the PDBs only.
-    -d         --distance_cutoff    : Distance cutoff for selecting residues (or "no_cutoff" for the whole protein).
-
--FMOPhore, --FMOPhore               : Run FMOPhore.
-    -qm       --qm_calculation      : Specify "MP2" or "DFTB" (requires GAMESS software).
-
--t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).
--c,         --cpus                  : Number of CPUs to use for parallelization.
-
-### Optional Parameters
+-dir,       --directory             : Process all PDB files in a directory.  
+-com,       --Prot_complex          : Process a single complex PDB file.  
+-PDB,       --PDB_ID                : Specify a PDB ID or a file containing multiple PDB IDs.  
+-prot,      --protein_pdb_file      : Path to the protein PDB file.  
+-ligs,      --ligand_files          : Path to a single ligand PDB file or a directory of ligand PDB files.  
+-PDBProcessor, --PDBProcessor       : Prepare the PDBs only.  
+    -d         --distance_cutoff    : Distance cutoff for selecting residues (or "no_cutoff" for the whole protein).  
+-FMOPhore, --FMOPhore               : Run FMOPhore.  
+    -qm       --qm_calculation      : Specify "MP2" or "DFTB" (requires GAMESS software).  
+-t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).  
+-c,         --cpus                  : Number of CPUs to use for parallelization.  
+   ```
+### Optional Parameters:
    ```bash
--DA-FMO,    --trajectory            : Analyze trajectories (requires SuMD and ACEMD).
--cof,       --cofactor              : Specify co-factor (e.g., `LYS-600`).
--BE,        --Binding_Energy        : Calculate binding energy (ΔE).
--lib,       --same_target           : Specify if analyzing the same target with different ligands.
--align,     --align                 : Align structures if needed.
+-DA-FMO,    --trajectory            : Analyze trajectories (requires SuMD and ACEMD).  
+-cof,       --cofactor              : Specify co-factor (e.g., `LYS-600`).  
+-BE,        --Binding_Energy        : Calculate binding energy (ΔE).  
+-lib,       --same_target           : Specify if analyzing the same target with different ligands.  
+-align,     --align                 : Align structures if needed.  
 -analysis,  --FMOPhore_analysis     : Perform analysis of completed calculations.
+   ```
 
-Example Command
 
+### Example Command
+   ```
 fmophore -dir /path/to/pdb/files -d 5 -qm DFTB -t 1 -c 20 -PDBProcessor -FMOPhore -lib -align
-
-Help
+   ```
+### Help
 To view the full list of options and their usage:
-
+   ```
 fmophore --help
+   ```
+### Outputs
 
-Outputs
 After running FMOPhore, you can expect the following outputs:
 
-FP_score.csv: Contains the FP-score and interaction data.
-FP_score_vs_Hotspots.png: A plot visualizing FP scores vs. hotspots.
-Ph4_heatmap.png: A 2D heatmap of hotspots.
+- **FP_score.csv**: Contains the FP-score and interaction data.
+- **FP_score_vs_Hotspots.png**: A plot visualizing FP scores vs. hotspots.
+- **Ph4_heatmap.png**: A 2D heatmap of hotspots.
 
-Analysis Script
-Use FP_score.py to analyze and generate results.
-Sample Outputs:
+### Analysis Script
 
-merged_files.csv and selected_data.csv (Percentage of Interaction (%), Lowest Energy per residue).
+Use `FP_score.py` to analyze and generate results.
 
-Requirements
+#### Sample Outputs:
+
+- **merged_files.csv**: Contains Percentage of Interaction (%) and Lowest Energy per residue.
+- **selected_data.csv**: Provides further processed results for detailed analysis.
+
+### Requirements
+
 The following Python libraries are required (automatically installed with the package):
 
-numpy
-tqdm
-timeout-decorator
-argparse
+- `numpy`
+- `tqdm`
+- `timeout-decorator`
+- `argparse`
 
-Developer Information
-Author: Peter E.G.F. Ibrahim
-Email: 2448959@dundee.ac.uk, peteregfi@gmail.com
-GitHub: PeterEGFIbrahim
+### Developer Information
 
-Licensing
+Author: Peter E.G.F. Ibrahim  
+Email: 2448959@dundee.ac.uk, peteregfi@gmail.com  
+GitHub: [PeterEGFIbrahim](https://github.com/PeterEGFIbrahim)  
+
+
+### Licensing
 This project is licensed under the GPL-3.0 License. See the LICENSE file for details.
     
-Copyright
+### Copyright
 © 2024 Peter E.G.F. Ibrahim. All rights reserved.
