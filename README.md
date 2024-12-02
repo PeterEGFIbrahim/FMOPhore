@@ -39,6 +39,7 @@ To ensure all dependencies are correctly installed and avoid conflicts, create a
 1. **Install Conda**: If Conda is not already installed, follow the installation guide [here](https://docs.conda.io/en/latest/miniconda.html).
 
 2. **Create the Environment**:
+   ```bash
    conda env create -f FMOPhore_env.yml
    conda activate FMOPhore_env
 
@@ -49,12 +50,16 @@ To ensure all dependencies are correctly installed and avoid conflicts, create a
    git clone https://github.com/PeterEGFIbrahim/FMOPhore.git
 
 Navigate to the directory:
+   ```bash
 cd FMOPhore
 
 Install the package:
+   ```bash
 pip install .
 
-Mandatory Parameters:
+
+### Mandatory Parameters:
+   ```bash
 -dir,       --directory             : Process all PDB files in a directory.
 -com,       --Prot_complex          : Process a single complex PDB file.
 -PDB,       --PDB_ID                : Specify a PDB ID or a file containing multiple PDB IDs.
@@ -70,7 +75,8 @@ Mandatory Parameters:
 -t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).
 -c,         --cpus                  : Number of CPUs to use for parallelization.
 
-Optional Parameters:
+### Optional Parameters:
+   ```bash
 -DA-FMO,    --trajectory            : Analyze trajectories (requires SuMD and ACEMD).
 -cof,       --cofactor              : Specify co-factor (e.g., `LYS-600`).
 -BE,        --Binding_Energy        : Calculate binding energy (ΔE).
@@ -78,8 +84,10 @@ Optional Parameters:
 -align,     --align                 : Align structures if needed.
 -analysis,  --FMOPhore_analysis     : Perform analysis of completed calculations.
 
+### Example commandline:
 fmophore -dir /path/to/pdb/files -d 5 -qm DFTB -t 1 -c 20 -PDBProcessor -FMOPhore -lib -align 
 
+### Help
 fmophore --help
 
 
