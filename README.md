@@ -120,6 +120,7 @@ After running FMOPhore, you can expect the following outputs:
 ### Analysis Script
 
 Use `FP_score.py` to analyze and generate results.
+In Examples folder >> FP_score examples
 
 #### Sample Outputs:
 
