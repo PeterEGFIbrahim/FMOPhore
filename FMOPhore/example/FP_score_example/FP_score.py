@@ -7,6 +7,9 @@ import seaborn as sns
 import matplotlib.cm as cm
 import os
 
+"""
+FMOPhore V.0.1 - FP-score equation - Copyright "©" 2024, Peter E.G.F. Ibrahim.
+"""
 def format_fragment_name(fragment):
     residue = fragment[:3].capitalize()
     chain = fragment[3]
