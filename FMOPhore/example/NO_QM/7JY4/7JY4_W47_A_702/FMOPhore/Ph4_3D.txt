@@ -1,0 +1,10 @@
+Fragment	distance	Angle	LIG.x	LIG.y	LIG.z	PROT.x	PROT.y	PROT.z	Bond_type	prot_atom_id	lig_atom_id
+LEUA1122	3.93	0	-10.622	0.117	-8.536	-11.318	-1.553	-12.025	Hydrophobic_Interactions	CD1	C21
+LEUA1196	3.83	0	-7.668	-4.756	-6.492	-6.873	-8.496	-6.351	Hydrophobic_Interactions	CD1	C1
+LEUA1198	3.62	0	-10.622	0.117	-8.536	-13.465	-2.130	-8.510	Hydrophobic_Interactions	CD1	C21
+ASPA1203	3.72	0	-3.835	0.473	-7.665	-4.436	4.037	-6.800	Hydrophobic_Interactions	CB	C12
+LEUA1256	3.34	0	-3.459	0.129	-6.366	-6.679	0.537	-5.581	Hydrophobic_Interactions	CD2	C13
+HISA1124	1.76	155.12	-2.444	-0.250	-10.800	-1.577	-1.606	-12.997	Hydrogen_Bonds	O	N1
+GLUA1197	1.76	159.31	-9.613	-3.311	-6.271	-11.287	-4.903	-4.862	Hydrogen_Bonds	O	N3
+META1199	2.26	148.70	-10.007	-2.160	-6.842	-12.525	-1.241	-5.194	Hydrogen_Bonds	N	N2
+ASNA1254	3.06	146.34	-3.233	-1.520	-4.685	-1.857	-0.609	-2.105	Halogen_Bonds	O	F1

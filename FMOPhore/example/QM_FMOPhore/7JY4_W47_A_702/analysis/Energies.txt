@@ -1,0 +1,4 @@
+FMO Interaction Energy (∆E) = (∆E)_ij^es + (∆E)_ij^ex + (∆E)_ij^(ct+mix) + (∆E)_ij^DI + (∆E)_^Gsol = -102.67 kcal/mol
+- = -------- = -
+DA-FMO Interaction Energy (ΔE) = ∑(ΔE_i^FMO) / N = -102.67 kcal/mol
+- = -------- = -
