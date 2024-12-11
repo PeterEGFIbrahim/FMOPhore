@@ -10,7 +10,7 @@
 
 # FMOPhore v0.1 - Hotspot Prediction and Classification
 
-FMOPhore is a Python package designed for hotspot identification and classification. It facilitates the preparation and processing of protein and ligand structures, as well as advanced quantum mechanics (QM) calculations. The tool supports various features, including binding energy calculations, trajectory processing, and analysis of previously completed computations.
+FMOPhore is a Python package designed for hotspot identification and classification. It facilitates the preparation and processing of protein and ligand structures, as well as advanced quantum mechanics (QM) calculations. The tool supports various features, including binding energy calculations, and analysis MD trajectory processing.
 
 ---
 
@@ -49,7 +49,7 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 
 ### Set up Conda Environment
 
-To ensure all dependencies are correctly installed and avoid conflicts, follow these steps:
+To ensure all dependencies are correctly installed and avoid conflicts (Except: GAMESS, SuMD and ACEMD, mentioned above), follow these steps:
 
 1. **Install Conda**: If Conda is not already installed, follow the installation guide [here](https://docs.conda.io/en/latest/miniconda.html).
 
