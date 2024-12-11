@@ -1,12 +1,10 @@
 # FMOPhore V.0.1 Hotspot prediction and classification
 
+---
+
 # <img width="900" alt="image" align="center" src="https://github.com/user-attachments/assets/4a3fbc8c-fd40-4b96-a621-dd14d669c0a3">
 
-##   System requirments
-- GAMESS software (https://www.msg.chem.iastate.edu/gamess/download.html) to run QM-FMO calculations.
-	Quantum Mechanics (QM) Calculations: If you plan to run QM calculations, ensure GAMESS is installed and contact the author for additional guidance.
-	System Requirements: For QM calculations, a GPU cluster equipped with at least 2 GPUs and 20 CPUs is recommended.
-- SuMD (https://github.com/molecularmodelingsection/SuMD) and ACEMD (https://software.acellera.com/acemd/tutorial.html) to run Dy-FMOPhore analysis.
+---
 
 # FMOPhore v0.1 - Hotspot Prediction and Classification
 
@@ -17,7 +15,9 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 ## System Requirements
 
 - **GAMESS Software**  
-  Required for QM-FMO calculations.  
+  Required for QM-FMO calculations.
+  - GAMESS software (https://www.msg.chem.iastate.edu/gamess/download.html) to run QM-FMO calculations.
+	Quantum Mechanics (QM) Calculations: To run QM calculations, ensure GAMESS is installed and contact the author for additional guidance.
   - [Download GAMESS](https://www.msg.chem.iastate.edu/gamess/download.html).  
   - A GPU cluster with at least 2 GPUs and 20 CPUs is recommended for QM calculations.  
   - Contact the author for additional guidance on running FMOPhore with GAMESS.
