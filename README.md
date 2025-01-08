@@ -39,7 +39,18 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 - **Analysis Tools**: Perform post-calculation analysis.
 
 ---
+### Set up Conda Environment
 
+To ensure all dependencies are correctly installed and avoid conflicts (Except: GAMESS, SuMD and ACEMD, mentioned above), follow these steps:
+
+1. **Install Conda**: If Conda is not already installed, follow the installation guide [here](https://docs.conda.io/en/latest/miniconda.html).
+
+2. **Create the Environment**:
+   ```bash
+   conda env create -f FMOPhore_env.yml
+   conda activate FMOPhore_env
+   ```
+   
 ## Installation
 
 ### Prerequisites
@@ -60,18 +71,6 @@ FMOPhore is a Python package designed for hotspot identification and classificat
 4. Install the package:
    ```bash
    pip install .
-
-### Set up Conda Environment
-
-To ensure all dependencies are correctly installed and avoid conflicts (Except: GAMESS, SuMD and ACEMD, mentioned above), follow these steps:
-
-1. **Install Conda**: If Conda is not already installed, follow the installation guide [here](https://docs.conda.io/en/latest/miniconda.html).
-
-2. **Create the Environment**:
-   ```bash
-   conda env create -f FMOPhore_env.yml
-   conda activate FMOPhore_env
-   ```
    
 ## Usage
 
