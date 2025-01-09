@@ -35,7 +35,7 @@ class SplitProcessor:
         self.modify_complex(self.distance_cutoff, ligand_info)
         # if self.Binding_Energy:
         self.process_FMO_protein(ligand_info)
-        os.chdir("..")
+        # os.chdir("..")
     def process_FMO_complex(self,ligand_info):
         pdb_lines = self.load_FMO_pdb_file(ligand_info)
         self.save_FMO_pdb_file(pdb_lines, ligand_info)
