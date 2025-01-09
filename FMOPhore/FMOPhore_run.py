@@ -22,9 +22,9 @@ from FMOPhore import CutoffProcessor
 from FMOPhore import SplitProcessor
 from FMOPhore import Pharmacophores
 from FMOPhore import Analysis
-# from FMOPhore import Fragmention_Processor
-# from FMOPhore import ComplexAnalysis
-# from FMOPhore import LibAnalysis
+from FMOPhore import Fragmention_Processor
+from FMOPhore import ComplexAnalysis
+from FMOPhore import LibAnalysis
 ####################################################################################################
 def parse_cutoff(value):
     if value == 'no_cutoff':
@@ -44,14 +44,11 @@ mandatory_params_text = """
     -prot       --protein_pdb_file      : Path to protein PDB file
     -ligs       --ligand_files          : Path to single ligand PDB file or directory of ligand PDB files
 
-    -PDBProcessor,     --PDBProcessor          : To prepare the PDBs only
-        -d                 --distance_cutoff       : Distance cutoff for selecting residues. Use "no_cutoff" to select the whole protein.
+    -qm         --qm_calculation        : MP2 or DFTB (GAMESS software required/ https://www.msg.chem.iastate.edu/gamess/download.html)
+    -d          --distance_cutoff       : Distance cutoff for selecting residues. Use "no_cutoff" to select the whole protein.
     
-    -FMOPhore,         --FMOPhore              : To run FMOPhore
-        -qm                --qm_calculation        : MP2 or DFTB (GAMESS software required/ https://www.msg.chem.iastate.edu/gamess/download.html)
-    
-    -t                 --timer                 : Timer in days e.g.: 1 day ==> -t 1  
-    -c                 --cpus                  : Please specify the number of cpus (cores; number of jobs to parallelize)
+    -t          --timer                 : Timer in days e.g.: 1 day ==> -t 1  
+    -c          --cpus                  : Please specify the number of cpus (cores; number of jobs to parallelize)
 """
 optional_params_text = """
 \033[1mOptinal parameters:\033[0m
@@ -73,10 +70,8 @@ mandatory_group.add_argument('-com', '--Prot_complex', type=str, help=argparse.S
 mandatory_group.add_argument('-PDB', '--PDB_ID', type=str, default=None, help=argparse.SUPPRESS)
 mandatory_group.add_argument('-prot', '--protein_pdb_file', type=str, help=argparse.SUPPRESS)
 mandatory_group.add_argument('-ligs', '--ligand_files', type=str, help=argparse.SUPPRESS)
-mandatory_group.add_argument('-PDBProcessor', '--PDBProcessor', action='store_true', default=None, help=argparse.SUPPRESS)
-mandatory_group.add_argument('-d', '--distance_cutoff', type=parse_cutoff, default=None, help=argparse.SUPPRESS, const=sys.maxsize, nargs='?')
-mandatory_group.add_argument('-FMOPhore', '--FMOPhore', action='store_true', default=None, help=argparse.SUPPRESS)
 mandatory_group.add_argument('-qm', '--qm_calculation', type=str, default=None, help=argparse.SUPPRESS)
+mandatory_group.add_argument('-d', '--distance_cutoff', type=parse_cutoff, default=None, help=argparse.SUPPRESS, const=sys.maxsize, nargs='?')
 mandatory_group.add_argument('-t', '--timer', type=int, default=None, help=argparse.SUPPRESS)
 mandatory_group.add_argument('-c', '--cpus', type=int, default=None, help=argparse.SUPPRESS)
 optional_group = parser.add_argument_group(optional_params_text)
@@ -90,13 +85,6 @@ optional_group.add_argument('-analysis', '--FMOPhore_analysis', action='store_tr
 parser.epilog = "Peter E.G.F. Ibrahim."
 args = parser.parse_args() 
 
-if args.qm_calculation:
-    print("""\033[1mPlease install GAMESS software:\033[0m
-        https://www.msg.chem.iastate.edu/gamess/download.html
-        Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
-        Then contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.""")
-    parser.print_help()
-    sys.exit(1)
 if (args.directory or args.Prot_complex or args.PDB_ID or (args.protein_pdb_file and args.ligand_files)):
     pass
 else:
@@ -130,10 +118,26 @@ for pdb_file in pdb_files:
 ####################################################################################################
 # Arguments
 ####################################################################################################
-# if args.qm_calculation == "DFTB":
-#     files_to_copy = ["run_DFTB.py", "rungms", "DFTB"]
-# elif args.qm_calculation == "MP2": 
-#     files_to_copy = ["run_MP2.py", "rungms", "MP2"]
+def copy_and_update_rungms(target_directory, files_to_copy):
+    package_path = os.path.dirname(__file__)  
+    for file_name in files_to_copy:
+        source = os.path.join(package_path, "QM_run", file_name)
+        destination = os.path.join(target_directory, file_name)
+        if not os.path.exists(source):
+            raise FileNotFoundError(f"Source file does not exist: {source}")
+        shutil.copy(source, destination)
+        if file_name in ["DFTB", "MP2"]:  
+            with open(destination, "r") as f:
+                content = f.read()
+            updated_content = content.replace(
+                "/FMOPhore/QM_runs/", f"{package_path}/QM_run/")
+            with open(destination, "w") as f:
+                f.write(updated_content)
+
+if args.qm_calculation == "DFTB":
+    files_to_copy = ["run_DFTB.py", "rungms", "DFTB"]
+elif args.qm_calculation == "MP2": 
+    files_to_copy = ["run_MP2.py", "rungms", "MP2"]
 ####################################################################################################
 ############################ To define the PDBs that FMOPhore will work on. #########################
 pdb_files = []
@@ -167,7 +171,6 @@ if args.protein_pdb_file and args.ligand_files and not args.directory:
         for ligand_file in ligand_files:
             merge_ligs_prot(args.protein_pdb_file, ligand_file, output_dir)
     pdb_files = glob.glob(os.path.join(output_dir, "*.pdb"))
-    print(f"Merged PDB files: {pdb_files}")
 ###################################################################################################
 # Library
 ###################################################################################################
@@ -206,14 +209,14 @@ excluded_strings = [ 'EOH', 'GZ6','DMS', 'FMT',
                      'SO4', 'ACE', 'NMA', 'NME', 'ACT', 'MES', 'MLA',
                      'OCY', 'SEP', 'TPO', 'IPA', 'TRS', 'CO', 'NO3', 'NAG' , 'PO4',
                      'BME', 'CSO', 'IMD', 'TCE', 'MDP', 'IOD', 'PTR','NI', 'TRS'
-                     , 'SAH', 'MTA'
+                     , 'SAH', 'MTA', 'DMS'
                      ]
 ####################################################################################################
 def preparePDBs(pdb_file):
     folder_name = os.path.splitext(pdb_file)[0]
     os.makedirs(folder_name, exist_ok=True)
-    shutil.copy(pdb_file, folder_name)
-    # shutil.move(pdb_file, folder_name)
+    # shutil.copy(pdb_file, folder_name)
+    shutil.move(pdb_file, folder_name)
     FMOPhore_log = "FMOPhore.log"
     FMOPhore_input_file = os.path.join(script_dir, FMOPhore_log)
     shutil.copy(FMOPhore_input_file, folder_name)
@@ -273,6 +276,9 @@ def sep_LIGsPDBs_all(files):
 def cutoffPDBs(pdb_file):
     base_name = os.path.splitext(os.path.basename(pdb_file))[0]
     folder_name = os.path.splitext(pdb_file)[0]
+    # full_path = os.path.join(os.getcwd(), base_name)
+    # print(f"Base name: {base_name}")
+    # print(f"Full path: {full_path}")
     os.chdir(folder_name)
     ############################################################
     def cutoffPDB_processor(filename, distance, same_target=False):
@@ -369,6 +375,8 @@ def FMOPhore(pdb_file):
                     pdb_file=f"{os.path.basename(pdb_file[:-4])}_{ligand_info}.pdb")
                 processor.run_Pharmacophores()
                 os.chdir('..')
+                print(os.getcwd())
+        os.chdir('..')
     ligands_by_chain = {}
     with open("FMOPhore.log", 'r') as f_in:
         for line in f_in:
@@ -406,9 +414,10 @@ def QM_run(pdb_file):
             if os.path.exists(ligand_dir):
                 os.chdir(ligand_dir) 
                 for file_to_copy in files_to_copy:
-                    source_file = os.path.join(script_dir, file_to_copy)
+                    source_file = os.path.join(script_dir, "QM_run", file_to_copy)
                     destination_file = os.path.join(file_to_copy)
                     shutil.copy(source_file, destination_file)
+                    target_directory = os.getcwd()
                 def wait_for_file(file_path, interval=20):
                     while not os.path.exists(file_path):
                         time.sleep(interval)
@@ -426,8 +435,10 @@ def QM_run(pdb_file):
                 com_pdb_file = f"{os.path.basename(pdb_file[:-4])}_{ligand_info}_FMO_{distance}_H.pdb"
                 wait_for_file(com_pdb_file)
                 if args.qm_calculation == "DFTB":
+                    copy_and_update_rungms(target_directory, files_to_copy)
                     process_qm_calculation(com_pdb_file, ligand_info, distance, "DFTB", Fragmention_Processor)
                 elif args.qm_calculation == "MP2":
+                    copy_and_update_rungms(target_directory, files_to_copy)
                     process_qm_calculation(com_pdb_file, ligand_info, distance, "MP2", Fragmention_Processor)
                 # if args.Binding_Energy:
                 #     prot_pdb_file = f"{os.path.basename(pdb_file[:-4])}_{ligand_info}_FMO_protein.pdb"
@@ -440,10 +451,10 @@ def QM_run(pdb_file):
                 while any(not os.path.exists(file) for file in input_files):
                     time.sleep(20) 
                 if args.qm_calculation == "DFTB":
-                    command5 = os.path.join(".", "run_DFTB.py")
+                    command5 = os.path.join("python run_DFTB.py")
                     run_command(command5)
                 elif args.qm_calculation == "MP2": 
-                    command5 = os.path.join(".", "run_MP2.py")
+                    command5 = os.path.join("python run_MP2.py")
                     run_command(command5)
 
                 os.remove('output.pdb')
@@ -492,7 +503,6 @@ def QM(pdb_files, qm_calculation):
 ################################### QM_FMOPhore analysis ###########################################
 ####################################################################################################
 def QM_FMOPhore_analysis(pdb_file):
-    parent_dir = os.getcwd()
     base_name = os.path.splitext(os.path.basename(pdb_file))[0]
     folder_name = os.path.splitext(pdb_file)[0]
     os.chdir(folder_name)
@@ -624,10 +634,10 @@ def QM_FMOPhore_analysis(pdb_file):
                                     # result7 = subprocess.run(command7, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                                     run_command(command6)
                                     if args.qm_calculation == "DFTB":
-                                        command5 = os.path.join(".", "run_DFTB.py")
+                                        command5 = os.path.join("python run_DFTB.py")
                                         run_command(command5)
                                     elif args.qm_calculation == "MP2": 
-                                        command5 = os.path.join(".", "run_MP2.py")
+                                        command5 = os.path.join("python run_MP2.py")
                                         run_command(command5)
                                     time.sleep(20)   
                                 else:
@@ -673,7 +683,8 @@ def QM_FMOPhore_analysis(pdb_file):
                             files_to_clean = log_files + inp_files + pdb_files
                             clean_up(files_to_clean)
                             os.chdir("..")
-                            clean_up(['dogms_personalized', 'run_DFTB_personalized.sh', 'rungms_personalized'])
+                            clean_up(['DFTB', 'rungms', 'rungms'])
+                            print("parent_dir = " , os.getcwd())
                             os.chdir('..')
                         except OSError as e:
                             if e.errno == 116:
@@ -713,13 +724,14 @@ def QM_FMOPhore_analysis(pdb_file):
                             print(error_message)
                             with open("../../../errors.log", "a") as error_file:
                                 error_file.write(error_message)  
-                        os.chdir("../../")
+                            os.chdir("../../")
+                        os.chdir("../")
                         print(os.getcwd())
                         return
                         print(f"analysing: Done", target_dir)
                     else:
                         print(f"Directory {target_dir} does not exist")
-    os.chdir(parent_dir)
+    os.chdir("..")
     print("parent_dir = " , os.getcwd())
     #############################################################
     message1 = f"FMOPhore - is done on: {folder_name}\n"
@@ -732,7 +744,6 @@ def FMOPhore_QM_analysis(pdb_files):
     QM_FMOPhore_analysis = analysis
     with Pool(processes=args.cpus) as pool:
         pool.map(QM_FMOPhore_analysis, pdb_files)
-
 ###################################################################################################    
 def library_analysis(pdb_files):
     if args.same_target:
@@ -788,12 +799,7 @@ def main_FMOPhore():
     FMOPhore_all(pdb_files)
 #################################################
 def main_QM():
-    message_QM = '''QM processing...
-    Please install GAMESS software: 
-            https://www.msg.chem.iastate.edu/gamess/download.html
-            If you have it installed and running:
-            Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
-            Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.'''
+    message_QM = '''QM processing...'''
     message_QM_fin = "Finished QM successfully."
     with open("FMOPhore.log", "a") as log_file:
         log_file.write(message_QM + "\n")
@@ -821,34 +827,19 @@ def main_library_analysis():
 #################################################
 @timeout_decorator.timeout(args.timer * 86400)
 def main():
-    if args.PDBProcessor:
-        main_Processor()
-    else:
-        pass
-    time.sleep(10)
-    if args.FMOPhore:
-        main_FMOPhore()
-    else:
-        pass
-    time.sleep(10)
     if args.qm_calculation:
-        print('''Please install GAMESS software: 
-            https://www.msg.chem.iastate.edu/gamess/download.html
-            If you have it installed and running:
-            Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
-            Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
-        parser.print_help()
-        sys.exit(1)
-        # main_QM()
-    # else:
-    #     pass
-    # time.sleep(10)    
-    # # if args.FMOPhore or args.FMOPhore_analysis:
-    # #     main_FMOPhore_analysis()
-    # #     main_library_analysis()
-    # else:
-    #     pass
-    # time.sleep(10)
+        main_Processor()
+        main_FMOPhore()
+        main_QM()
+    else:
+        pass
+    time.sleep(10)    
+    if args.qm_calculation or args.FMOPhore_analysis:
+        main_FMOPhore_analysis()
+        main_library_analysis()
+    else:
+        pass
+    time.sleep(10)
 ##################################################################################################
 ##################################################################################################
 if __name__ == '__main__':
