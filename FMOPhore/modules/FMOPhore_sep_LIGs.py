@@ -21,13 +21,13 @@ import multiprocessing
 class LIGProcessor:
     def __init__(self, pdb_file):
         self.pdb_file = pdb_file
+        self.ligands_list = []
+        self.chain_id_list = []  # Initialize as an instance variable
     def chain_id_list_all(self):
         return self.chain_id_list
     def ligands_list_all(self):
         return self.ligands_list
     ################################################################
-    chain_id_list = []
-    ligands_list  = []
     def process_ligands(self, ligand):
         ligand_info = "_".join(ligand.split())
         pdb_lines_ligand = self.load_processed_pdb_file(ligand_info)
