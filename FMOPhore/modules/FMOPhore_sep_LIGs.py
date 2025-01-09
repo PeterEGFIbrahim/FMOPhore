@@ -56,7 +56,7 @@ class LIGProcessor:
             self.save_processed_pdb_file_ligand_info(pdb_lines_ligand, ligand_info)
             self.renumber_important_residues(ligand_info)
             print(True)
-        os.chdir("..")
+            os.chdir("..")
     def process_complex_LIG(self):
         pdb_lines = self.load_pdb_file()
         pdb_lines = self.separate_ligands(pdb_lines)
