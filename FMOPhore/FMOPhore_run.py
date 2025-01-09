@@ -85,6 +85,14 @@ optional_group.add_argument('-analysis', '--FMOPhore_analysis', action='store_tr
 parser.epilog = "Peter E.G.F. Ibrahim."
 args = parser.parse_args() 
 
+if args.qm_calculation:
+    print('''Please install GAMESS software: 
+        https://www.msg.chem.iastate.edu/gamess/download.html
+        If you have it installed and running:
+        Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+        Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+
+
 if (args.directory or args.Prot_complex or args.PDB_ID or (args.protein_pdb_file and args.ligand_files)):
     pass
 else:
@@ -830,7 +838,13 @@ def main():
     if args.qm_calculation:
         main_Processor()
         main_FMOPhore()
-        main_QM()
+        print('''Please install GAMESS software: 
+            https://www.msg.chem.iastate.edu/gamess/download.html
+            If you have it installed and running:
+            Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+            Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+
+        # main_QM()
     else:
         pass
     time.sleep(10)    
