@@ -81,10 +81,8 @@ To ensure all dependencies are correctly installed and avoid conflicts (Except: 
 -PDB,       --PDB_ID                : Specify a PDB ID or a file containing multiple PDB IDs.  
 -prot,      --protein_pdb_file      : Path to the protein PDB file.  
 -ligs,      --ligand_files          : Path to a single ligand PDB file or a directory of ligand PDB files.  
--PDBProcessor, --PDBProcessor       : Prepare the PDBs only.  
-    -d         --distance_cutoff    : Distance cutoff for selecting residues (or "no_cutoff" for the whole protein).  
--FMOPhore, --FMOPhore               : Run FMOPhore.  
-    -qm       --qm_calculation      : Specify "MP2" or "DFTB" (requires GAMESS software).  
+-d          --distance_cutoff       : Distance cutoff for selecting residues (or "no_cutoff" for the whole protein).  
+-qm         --qm_calculation        : Specify "MP2" or "DFTB" (requires GAMESS software).  
 -t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).  
 -c,         --cpus                  : Number of CPUs to use for parallelization.  
    ```
