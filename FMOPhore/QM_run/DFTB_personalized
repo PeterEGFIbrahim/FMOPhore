@@ -1,0 +1,20 @@
+#!/bin/bash -l
+#
+#$ -N DFTB
+#$ -pe smp 1
+#$ -cwd
+#$ -q ddu.q@hpc-ddu-gpu-001.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-002.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-003.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-004.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-005.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-006.compute.dundee.ac.uk
+#$ -q ddu.q@hpc-ddu-gpu-007.compute.dundee.ac.uk
+
+#qsub -R y -mods l_hard m_mem_free 16G
+mkdir -p files_dat/
+export LD_PRELOAD=/FMOPhore/QM_run/lib/libgfortran.so.3
+/FMOPhore/QM_run/rungms_personalized input.inp 01 1 >& output.log
+mv *dat files_dat/.
+find . -size 0 -delete
+
