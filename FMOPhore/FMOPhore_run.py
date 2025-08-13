@@ -963,7 +963,13 @@ def main():
     if args.qm_calculation and not args.FMOPhore_analysis:
         main_Processor()
         main_FMOPhore()
-        main_QM()
+        print('''Please install GAMESS software: 
+            https://www.msg.chem.iastate.edu/gamess/download.html
+            If you have it installed and running:
+            Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+            Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+
+        # main_QM()
     else:
         pass
     time.sleep(10)
