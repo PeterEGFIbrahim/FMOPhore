@@ -21,12 +21,15 @@ FMOPhore is a Python package designed for hotspot identification and classificat
   - [Download GAMESS](https://www.msg.chem.iastate.edu/gamess/download.html).  
   - A GPU cluster with at least 2 GPUs and 20 CPUs is recommended for QM calculations.  
   - Contact the author for additional guidance on running FMOPhore with GAMESS.
-
+  - Please install GAMESS software: 
+        If you have it installed and running:
+        Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+        Contact the author Peter E.G.F. Ibrahim: pibrahim001@dundee.ac.uk - 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.
+    
 - **SuMD and ACEMD**  
   Required for Dy-FMOPhore analysis.  
   - [SuMD](https://github.com/molecularmodelingsection/SuMD)  
   - [ACEMD](https://software.acellera.com/acemd/tutorial.html)
-
 ---
 
 ## Features
