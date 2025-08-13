@@ -4,6 +4,8 @@ import shutil
 import argparse
 from Bio import PDB
 from Bio.PDB import Superimposer
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
 
 def rename_pdb_files(directory_path):
     pdb_files = [f for f in os.listdir(directory_path) if f.endswith(".pdb")]
