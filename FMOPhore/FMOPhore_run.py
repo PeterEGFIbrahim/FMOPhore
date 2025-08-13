@@ -99,6 +99,13 @@ optional_group.add_argument('-p', '--personalized', action='store_true', default
 parser.epilog = "Peter E.G.F. Ibrahim."
 args = parser.parse_args() 
 
+if args.qm_calculation:
+    print('''Please install GAMESS software: 
+        https://www.msg.chem.iastate.edu/gamess/download.html
+        If you have it installed and running:
+        Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+        Contact the author Peter E.G.F. Ibrahim: pibrahim001@dundee.ac.uk - 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+
 # EnvironmentGuard().enforce()
 
 if (args.directory or args.Prot_complex or args.PDB_ID or (args.protein_pdb_file and args.ligand_files)):
