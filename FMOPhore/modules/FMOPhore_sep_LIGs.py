@@ -5,7 +5,7 @@ from Bio.PDB import PDBParser, Selection, Structure, Model, Chain, PDBIO, is_aa,
 import sys
 import os
 import re
-import pymol
+import pymol 
 from pymol import cmd
 import glob
 import shutil
@@ -15,6 +15,11 @@ import csv
 import math
 from pathlib import Path
 import multiprocessing
+import argparse
+from .FMOPhore_utility import EnvironmentGuard
+from collections import defaultdict, Counter
+# EnvironmentGuard().enforce()
+
 ###################################################################################################
 #  LIGProcessor
 ###################################################################################################
@@ -22,11 +27,8 @@ class LIGProcessor:
     def __init__(self, pdb_file):
         self.pdb_file = pdb_file
         self.ligands_list = []
-        self.chain_id_list = []  # Initialize as an instance variable
-    def chain_id_list_all(self):
-        return self.chain_id_list
-    def ligands_list_all(self):
-        return self.ligands_list
+        self.chain_id_list = []  
+
     ################################################################
     def process_ligands(self, ligand):
         ligand_info = "_".join(ligand.split())
@@ -55,10 +57,11 @@ class LIGProcessor:
             pdb_lines_ligand = self.modify_atom_names(pdb_lines_ligand)
             self.save_processed_pdb_file_ligand_info(pdb_lines_ligand, ligand_info)
             self.renumber_important_residues(ligand_info)
-            print(True)
             os.chdir("..")
+
     def process_complex_LIG(self):
         pdb_lines = self.load_pdb_file()
+        pdb_lines = self.correct_ligand_chain(pdb_lines)
         pdb_lines = self.separate_ligands(pdb_lines)
         for ligand in set(self.ligands_list):
             self.process_ligands(ligand)
@@ -67,50 +70,259 @@ class LIGProcessor:
         with open(self.pdb_file, 'r') as f:
             return f.readlines()
     ################################################################
+    # def correct_ligand_chain(self, pdb_lines):
+    #     excluded_strings = sorted(set([
+    #         'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+    #         'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+    #         'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+    #         'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR', 'CL',
+    #         'T3P', 'WAT', 'HOH', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+    #     ]))
+
+    #     self.ligands_list.clear()
+    #     self.chain_id_list.clear()
+
+    #     ligand_chain_map = defaultdict(list)
+
+    #     with open("FMOPhore.log", "r") as log_file:
+    #         for line in log_file:
+    #             line = line.strip()
+    #             if "falls in chain " in line:
+    #                 parts = line.split()
+    #                 if len(parts) >= 5:
+    #                     ligand_name = parts[0].strip()
+    #                     chain_id = parts[1].strip()
+    #                     ligand_num = parts[2].strip()
+    #                     ligand_key = (ligand_name, ligand_num)
+    #                     ligand_chain_map[ligand_key].append(chain_id)
+    #     ligand_to_chain = {
+    #         key: Counter(chains).most_common(1)[0][0]
+    #         for key, chains in ligand_chain_map.items()
+    #     }
+    #     seen = set()
+    #     for i, line in enumerate(pdb_lines):
+    #         ligand_name = line[17:20].strip()
+    #         if line.startswith("HETATM") and ligand_name not in excluded_strings:
+    #             ligand_name = line[17:20].strip()
+    #             ligand_num = line[22:26].strip()
+    #             chain_id = line[21]
+    #             ligand_key = (ligand_name, ligand_num)
+    #             if ligand_key in ligand_to_chain:
+    #                 correct_chain = ligand_to_chain[ligand_key]
+    #                 if chain_id != correct_chain:
+    #                     pdb_lines[i] = line[:21] + correct_chain + line[22:]
+    #                     chain_id = correct_chain  
+    #             ligand_id = f"{ligand_name} {chain_id} {ligand_num}"
+    #             if ligand_id not in seen:
+    #                 seen.add(ligand_id)
+    #                 self.chain_id_list.append(chain_id)
+    #                 self.ligands_list.append(ligand_id)
+    #     return pdb_lines
+    def correct_ligand_chain(self, pdb_lines):
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR', 'CL',
+            'T3P', 'WAT', 'HOH', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+        def parse_cofactor():
+            try:
+                with open("FMOPhore.log", "r", encoding="utf-8", errors="ignore") as fh:
+                    for ln in fh:
+                        s = ln.strip()
+                        if not s.lower().startswith("cofactor:"):
+                            continue
+                        m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})\s+([A-Za-z_ ])\s+(\d+)', s, re.I)
+                        if m:
+                            name, ch, num = m.group(1).upper(), m.group(2), int(m.group(3))
+                            if ch == "_": ch = " "
+                            return (name, ch, num)
+                        m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})-([A-Za-z_ ])-(\d+)', s, re.I)
+                        if m:
+                            name, ch, num = m.group(1).upper(), m.group(2), int(m.group(3))
+                            if ch == "_": ch = " "
+                            return (name, ch, num)
+            except FileNotFoundError:
+                pass
+            return None
+        cofactor_triplet = parse_cofactor() 
+        self.ligands_list.clear()
+        self.chain_id_list.clear()
+        ligand_chain_map = defaultdict(list)
+        try:
+            with open("FMOPhore.log", "r", encoding="utf-8", errors="ignore") as log_file:
+                for line in log_file:
+                    line = line.strip()
+                    if "falls in chain " in line:
+                        parts = line.split()
+                        if len(parts) >= 5:
+                            ligand_name = parts[0].strip().upper()
+                            chain_id = parts[1].strip()
+                            ligand_num = parts[2].strip()
+                            ligand_chain_map[(ligand_name, ligand_num)].append(chain_id)
+        except FileNotFoundError:
+            pass
+        ligand_to_chain = {
+            key: Counter(chains).most_common(1)[0][0]
+            for key, chains in ligand_chain_map.items() if chains
+        }
+        seen = set()
+        for i, line in enumerate(pdb_lines):
+            if not line.startswith("HETATM"):
+                continue
+            ligand_name = line[17:20].strip().upper()
+            if ligand_name in excluded_strings:
+                continue
+            ligand_num = line[22:26].strip()
+            chain_id = line[21]
+            ligand_key = (ligand_name, ligand_num)
+            if ligand_key in ligand_to_chain:
+                correct_chain = ligand_to_chain[ligand_key]
+                if chain_id != correct_chain:
+                    pdb_lines[i] = line[:21] + correct_chain + line[22:]
+                    chain_id = correct_chain
+            if cofactor_triplet is not None:
+                cof_name, cof_chain, cof_num = cofactor_triplet
+                try:
+                    ligand_num_int = int(ligand_num)
+                except ValueError:
+                    ligand_num_int = None
+                if (
+                    ligand_name == cof_name and
+                    chain_id == cof_chain and
+                    ligand_num_int is not None and ligand_num_int == cof_num
+                ):
+                    continue
+
+            ligand_id = f"{ligand_name} {chain_id} {ligand_num}"
+            if ligand_id not in seen:
+                seen.add(ligand_id)
+                self.chain_id_list.append(chain_id)
+                self.ligands_list.append(ligand_id)
+        return pdb_lines
+    ################################################################
     def separate_ligands(self, pdb_lines):
-        excluded_strings = [
-          'HD2 ASP','FMT', 'ANISOU', 'BU3','NAG' , 'PO4',
-          'PEG', 'GOL', 'BO3', 'EDO', 'SO4',  'NO3',
-          'ACE', 'NMA', 'NME', 'ACT', 'MES', 'TRS',
-          'OCY', "HA2 PHE", 'SEP', 'BME', 'CSO', 'IMD',
-          'TPO', 'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO',
-          'ZN', 'CL','T3P', 'WAT', 'HOH', 'MG'
-          ]
+        excluded_resnames = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR', 'CL',
+            'T3P', 'WAT', 'HOH', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+
+        def parse_triplet(text):
+            m = re.search(r'\b([A-Za-z0-9]{1,3})\s+([A-Za-z_])\s+(\d+)\b', text)
+            if not m:
+                return None
+            resname, chain, resnum = m.group(1).upper(), m.group(2), int(m.group(3))
+            return (resname, chain, resnum)
+        cofactor_triplet = None
+        ligands_in_log = []
+        try:
+            with open("FMOPhore.log", "r", encoding="utf-8", errors="ignore") as fin:
+                for ln in fin:
+                    s = ln.strip()
+                    if s.lower().startswith("cofactor:"):
+                        t = parse_triplet(s)
+                        if t: cofactor_triplet = t
+                    elif s.endswith("! charge 0") or "falls in chain" in s:
+                        t = parse_triplet(s)
+                        if t: ligands_in_log.append(t)
+        except FileNotFoundError:
+            return
+        targets = []
+        for t in ligands_in_log:
+            if t[0] in excluded_resnames:
+                continue
+            if cofactor_triplet and t == cofactor_triplet:
+                continue
+            targets.append(t)
+        if not targets:
+            return
+        def fields_from_line(line):
+            resname = line[17:20].strip().upper()
+            chain = line[21]
+            resnum_str = line[22:26].strip()
+            resnum = int(resnum_str) if resnum_str.isdigit() else None
+            return resname, chain, resnum
+        def matches_triplet(line, triplet):
+            if not line.startswith("HETATM"):
+                return False
+            resname, chain, resnum = fields_from_line(line)
+            return (
+                resname == triplet[0] and
+                chain == triplet[1] and
+                resnum is not None and resnum == triplet[2]
+            )
+
+        base_lines = []
+        target_sets = set(targets)
         for line in pdb_lines:
-            record_type = line[:6].strip()
-            if record_type == 'HETATM' and line[17:20].strip() not in excluded_strings:
-                chain_id = line[21:22]
-                ligand = line[17:26]
-                self.ligands_list.append(ligand)
-        ligands_by_chain = {}
-        with open("FMOPhore.log", 'r') as f_in:
-            for line in f_in:
-                line = line.strip()
-                if "falls in chain" in line:
-                    ligand_name_from_log = line.split()[0]  
-                    if ligand_name_from_log not in excluded_strings:
-                        ligand_info = line[0:9]
-                        chain_id = line[4:5]  
-                        if chain_id not in ligands_by_chain:
-                            ligands_by_chain[chain_id] = []
-                        ligands_by_chain[chain_id].append(f"{ligand_info}")
-        filtered_pdb_lines = pdb_lines[:]
-        for ligands in ligands_by_chain.values():
-            for ligand in ligands:
-                filtered_pdb_lines = [line for line in filtered_pdb_lines if ligand not in line]
-        if any(len(ligands) >= 1 for ligands in ligands_by_chain.values()):
-            for chain_id, ligands in ligands_by_chain.items():
-                for ligand in ligands:
-                    ligand_info = "_".join(ligand.split())
-                    pdb_file_name = f"{self.pdb_file[:-4]}_{ligand_info}.pdb"
-                    with open(pdb_file_name, 'w') as f:
-                        written_ligand = False
-                        for line in filtered_pdb_lines:
-                            f.write(line.rstrip() + '\n')
-                        for line in pdb_lines:
-                            if re.search(fr"\b{ligand}\b", line):
-                                f.write(line.rstrip() + '\n')
-                                written_ligand = True
+            if line.startswith("HETATM"):
+                keep = True
+                for t in target_sets:
+                    if matches_triplet(line, t):
+                        keep = False
+                        break
+                if keep:
+                    base_lines.append(line)
+            else:
+                base_lines.append(line)
+
+        written_any = False
+        for (resname, chain, resnum) in targets:
+            ligand_lines = [ln for ln in pdb_lines if matches_triplet(ln, (resname, chain, resnum))]
+            if not ligand_lines:
+                continue  
+            ligand_tag = f"{resname}_{chain}_{resnum}"
+            out_name = f"{self.pdb_file[:-4]}_{ligand_tag}.pdb"
+            with open(out_name, "w", encoding="utf-8") as fout:
+                for ln in base_lines:
+                    fout.write(ln if ln.endswith("\n") else (ln + "\n"))
+                for ln in ligand_lines:
+                    fout.write(ln if ln.endswith("\n") else (ln + "\n"))
+            written_any = True
+
+        if not written_any:
+            with open("FMOPhore.log", "a", encoding="utf-8") as flog:
+                flog.write("# separate_ligands: no non-cofactor ligands found to split\n")
+
+        # for line in pdb_lines:
+        #     record_type = line[:6].strip()
+        #     if record_type == 'HETATM' and line[17:20].strip() not in excluded_strings:
+        #         chain_id = line[21:22]
+        #         ligand = line[17:26]
+        #         self.ligands_list.append(ligand)
+        # ligands_by_chain = {}
+        # with open("FMOPhore.log", 'r') as f_in:
+        #     for line in f_in:
+        #         line = line.strip()
+        #         if "falls in chain" in line:
+        #             ligand_name_from_log = line.split()[0]  
+        #             if ligand_name_from_log not in excluded_strings:
+        #                 ligand_info = line[0:9]
+        #                 chain_id = line[4:5]  
+        #                 if chain_id not in ligands_by_chain:
+        #                     ligands_by_chain[chain_id] = []
+        #                 ligands_by_chain[chain_id].append(f"{ligand_info}")
+        # filtered_pdb_lines = pdb_lines[:]
+        # for ligands in ligands_by_chain.values():
+        #     for ligand in ligands:
+        #         filtered_pdb_lines = [line for line in filtered_pdb_lines if ligand not in line]
+        # if any(len(ligands) >= 1 for ligands in ligands_by_chain.values()):
+        #     for chain_id, ligands in ligands_by_chain.items():
+        #         for ligand in ligands:
+        #             ligand_info = "_".join(ligand.split())
+        #             pdb_file_name = f"{self.pdb_file[:-4]}_{ligand_info}.pdb"
+        #             with open(pdb_file_name, 'w') as f:
+        #                 written_ligand = False
+        #                 for line in filtered_pdb_lines:
+        #                     f.write(line.rstrip() + '\n')
+        #                 for line in pdb_lines:
+        #                     if re.search(fr"\b{ligand}\b", line):
+        #                         f.write(line.rstrip() + '\n')
+        #                         written_ligand = True
     ################################################################
     def load_processed_pdb_file(self, ligand_info):
         pdb_file_path = f"{self.pdb_file[:-4]}_{ligand_info}.pdb"
@@ -118,14 +330,13 @@ class LIGProcessor:
             return f.readlines()
     ###############################################################
     def filter_lines(self, pdb_lines):
-        excluded_strings = [
-          'HD2 ASP','FMT', 'ANISOU',  'NO3','NAG' , 'PO4',
-          'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'IPA', 
-          'ACE', 'NMA', 'NME', 'ACT', 'MES', 'TRS', 'MLA',
-          'OCY', "HA2 PHE", 'SEP', 'BME', 'CSO', 'IMD', 'CO', 
-          'TPO', 'TCE', 'MDP', 'IOD', 'NI'
-                     , 'SAH', 'MTA', 'MG'
-          ]
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR',
+            'T3P', 'WAT', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
         pdb_lines = [
             line for line in pdb_lines
             if not (any(substr in line for substr in excluded_strings) or
@@ -170,68 +381,6 @@ class LIGProcessor:
     def save_processed_pdb_file(self, pdb_lines, ligand_info):
         with open(f"{self.pdb_file[:-4]}_{ligand_info}.pdb", 'w') as f:
             f.writelines(pdb_lines)
-    ################################################################
-    def correct_ligand_chain(self, pdb_lines):
-        excluded_strings = [
-          'WAT', 'T3P',  'FMT', 'ANISOU',  'NO3','NAG' , 'PO4',
-          'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'ACE', 'TRS',
-          'NMA', 'NME', 'ACT', 'MES', 'OCY','SEP', 'HOH',
-          'TPO', 'TCE', 'MDP', 'IOD', 'MG'
-                     , 'SAH', 'MTA'
-        ]
-        ligands = {}
-        for line in pdb_lines:
-            if line.startswith("HETATM") and line[17:20].strip() not in excluded_strings:
-                ligand_key = (line[17:20], line[22:26])
-                chain_id = line[21]
-                if ligand_key in ligands:
-                    all_chains = [chain for chains in ligands.values() for chain in chains]
-                    most_common_chain = max(set(all_chains), key=all_chains.count)
-                else:
-                    ligands[ligand_key] = chain_id
-        with open("FMOPhore.log", "a") as error_file:  
-            ligand_dict = {}
-            for i, line in enumerate(pdb_lines):
-                if line.startswith("HETATM"):
-                    ligand = line[17:26]
-                    ligand_name = line[17:20]
-                    ligand_num = line[22:26]
-                    chain_id = line[21]
-                    ligand_key = (ligand_name, ligand_num)
-                    if ligand_key in ligand_dict:
-                        existing_chain_id = ligand_dict[ligand_key]
-                        if chain_id != existing_chain_id:
-                            pdb_lines[i] = line[:21] + most_common_chain + line[22:]
-                            if ligand_key[0].upper() not in [' ZN', 'T3P', 'WAT', 'HOH']:
-                                error_message = "{} falls between multiple chains {} !".format(ligand, chain_id)
-                                error_file.write(error_message + "\n")
-                        else:
-                            if ligand_key[0].upper() not in [' ZN', 'T3P', 'WAT', 'HOH']:
-                                error_message = "{} falls in chain {} !".format(ligand, chain_id)
-                                error_file.write(error_message + "\n")
-                    else:
-                        ligand_dict[ligand_key] = chain_id
-        seen_lines = set()
-        filtered_lines = []
-        with open("FMOPhore.log", 'r') as f_in:
-            for line in f_in:
-                line = line.strip()
-                if line not in seen_lines:
-                    filtered_lines.append(line)
-                    seen_lines.add(line)
-        with open("FMOPhore.log", 'w') as f_out:
-            for line in filtered_lines:
-                f_out.write(line + '\n')
-        ligands_count = 0
-        ligand_chain_combinations = set()
-        for line in pdb_lines:
-            record_type = line[:6].strip()
-            if record_type == 'HETATM' and line[17:20].strip() not in [' ZN', 'T3P', 'WAT', 'HOH']:
-                chain_id = line[21:22]
-                ligand = line[17:26]
-                self.chain_id_list.append(chain_id)  
-                self.ligands_list.append(ligand)
-        return pdb_lines
     ################################################################
     def ligand_charge(self, pdb_lines):
         with open("FMOPhore.log", 'r') as log_file:
@@ -281,40 +430,119 @@ class LIGProcessor:
         shutil.move(f"{self.pdb_file[:-4]}_{ligand_info}.pdb", new_pdb_path) 
     ################################################################
     def rename_LIG(self, pdb_lines):
-        excluded_strings = ['FMT', 'IOD', 'HOH', 'WAT', 'T3P', 'CL','NAG' , 'PO4',
-                            'MG', 'ZN','PEG', 'DMS', 'GOL', 'BO3',  'NO3',
-                            'EDO', 'SO4', 'ACE', 'NMA', 'NME', 'ACT', 'TRS',
-                            'MES', 'OCY','FMT','PEG','SEP', 'BME', 'CSO', 
-                            'IMD','TPO', 'TCE', 'MDP', 'NI'
-                            , 'SAH', 'MTA', 'MG'
-                            ]
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR', 'CL',
+            'T3P', 'WAT', 'HOH', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+        # for i in range(len(pdb_lines)):
+        #     if pdb_lines[i][17:20] == "LIG" and pdb_lines[i][0:6] != "TER   ":
+        #         pdb_lines[i] = pdb_lines[i][:0] + "HETATM" + pdb_lines[i][6:]
+        # for i, line in enumerate(pdb_lines):
+        #     if line.startswith('HETATM') and line[17:20].strip() not in excluded_strings:
+        #         pdb_lines[i] = line[:22] + '9999' + line[26:]
+        # for i, line in enumerate(pdb_lines):
+        #     record_type = line[:6].strip()
+        #     residue_name = line[17:20].strip()
+        #     if record_type in ['ATOM', 'HETATM']:
+        #         if record_type == 'HETATM':
+        #             if line[17:20].strip() in ['T3P', 'WAT']:
+        #                 line = line[:17] + 'HOH' + line[20:]
+        #             elif line[17:20].strip() in ['HIE', 'HIP', 'HID']:
+        #                 line = line[:17] + 'HIS' + line[20:]
+        #         if record_type == 'HETATM':
+        #             if line[17:20].strip() not in excluded_strings:
+        #                 line = line[:17] + 'LIG' + line[20:]
+        #             if line[26].isdigit() or line[26].isalpha():
+        #                 line = line[:26] + ' ' + line[26:]
+        #         if record_type == 'ATOM':
+        #             if line[16:17].strip() in ['A']:
+        #                 line = line[:16] + ' ' + line[17:]
+        #         if record_type in ['ATOM', 'HETATM']:
+        #             if line[73:74].strip() in ['A', 'B', 'C', 'D']:
+        #                 line = line[:73] + ' ' + line[74:]
+        #         pdb_lines[i] = line
+        # return pdb_lines
+
+        def pad80(s: str) -> str:
+            s = s.rstrip("\n")
+            return s.ljust(80)
+
+        def line_fields(padded_line):
+            record = padded_line[:6].strip()
+            resname = padded_line[17:20].strip().upper()
+            chain = padded_line[21]
+            resnum_str = padded_line[22:26].strip()
+            return record, resname, chain, resnum_str
+
+        def parse_cofactor_triplet():
+            try:
+                with open("../FMOPhore.log", "r", encoding="utf-8", errors="ignore") as fh:
+                    for raw in fh:
+                        s = raw.strip()
+                        if not s.lower().startswith("cofactor:"):
+                            continue
+                        m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})\s+([A-Za-z_ ])\s+(\d+)', s, re.I)
+                        if not m:
+                            m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})-([A-Za-z_ ])-(\d+)', s, re.I)
+                        if m:
+                            name, ch, num = m.group(1).upper(), m.group(2), int(m.group(3))
+                            if ch == "_": ch = " "
+                            return (name, ch, num)
+            except FileNotFoundError:
+                pass
+            return None
+
+        def is_cofactor_line(padded_line, cof_triplet):
+            if not cof_triplet:
+                return False
+            record, resname, chain, resnum_str = line_fields(padded_line)
+            if record not in ("ATOM", "HETATM") or not resnum_str.isdigit():
+                return False
+            name, ch, num = cof_triplet
+            return (resname == name and chain == ch and int(resnum_str) == num)
+
+        cof = parse_cofactor_triplet()
         for i in range(len(pdb_lines)):
-            if pdb_lines[i][17:20] == "LIG" and pdb_lines[i][0:6] != "TER   ":
-                pdb_lines[i] = pdb_lines[i][:0] + "HETATM" + pdb_lines[i][6:]
-        for i, line in enumerate(pdb_lines):
-            if line.startswith('HETATM') and line[17:20].strip() not in excluded_strings:
-                pdb_lines[i] = line[:22] + '9999' + line[26:]
-        for i, line in enumerate(pdb_lines):
-            record_type = line[:6].strip()
-            residue_name = line[17:20].strip()
-            if record_type in ['ATOM', 'HETATM']:
-                if record_type == 'HETATM':
-                    if line[17:20].strip() in ['T3P', 'WAT']:
-                        line = line[:17] + 'HOH' + line[20:]
-                    elif line[17:20].strip() in ['HIE', 'HIP', 'HID']:
-                        line = line[:17] + 'HIS' + line[20:]
-                if record_type == 'HETATM':
-                    if line[17:20].strip() not in excluded_strings:
-                        line = line[:17] + 'LIG' + line[20:]
-                    if line[26].isdigit() or line[26].isalpha():
-                        line = line[:26] + ' ' + line[26:]
-                if record_type == 'ATOM':
-                    if line[16:17].strip() in ['A']:
-                        line = line[:16] + ' ' + line[17:]
-                if record_type in ['ATOM', 'HETATM']:
-                    if line[73:74].strip() in ['A', 'B', 'C', 'D']:
-                        line = line[:73] + ' ' + line[74:]
-                pdb_lines[i] = line
+            pl = pad80(pdb_lines[i])
+            record = pl[:6]
+            if pl[17:20] == "LIG" and record != "TER   ":
+                pdb_lines[i] = "HETATM" + pl[6:] + ("\n" if pdb_lines[i].endswith("\n") else "")
+
+        for i, raw in enumerate(pdb_lines):
+            pl = pad80(raw)
+            record, resname, chain, resnum_str = line_fields(pl)
+            if record == "HETATM" and resname not in excluded_strings:
+                if not is_cofactor_line(pl, cof):
+                    pl = pl[:22] + "9999" + pl[26:]
+            pdb_lines[i] = pl.rstrip() + ("\n" if raw.endswith("\n") else "")
+
+        for i, raw in enumerate(pdb_lines):
+            pl = pad80(raw)
+            record, resname, chain, resnum_str = line_fields(pl)
+            if record not in ("ATOM", "HETATM", "TER"):
+                continue
+            if is_cofactor_line(pl, cof):
+                pdb_lines[i] = pl.rstrip() + ("\n" if raw.endswith("\n") else "")
+                continue
+            if record == "HETATM":
+                if resname in ["T3P", "WAT"]:
+                    pl = pl[:17] + "HOH" + pl[20:]
+                elif resname in ["HIE", "HIP", "HID"]:
+                    pl = pl[:17] + "HIS" + pl[20:]
+                resname_now = pl[17:20].strip().upper()
+                if resname_now not in excluded_strings:
+                    pl = pl[:17] + "LIG" + pl[20:]
+                if pl[26].isalnum():
+                    pl = pl[:26] + " " + pl[27:]
+            if record == "ATOM":
+                if pl[16].strip() == "A":
+                    pl = pl[:16] + " " + pl[17:]
+            if pl[73].strip() in ["A", "B", "C", "D"]:
+                pl = pl[:73] + " " + pl[74:]
+            pdb_lines[i] = pl.rstrip() + ("\n" if raw.endswith("\n") else "")
         return pdb_lines
     ################################################################
     def modify_atom_names(self, pdb_lines):
@@ -376,9 +604,28 @@ class LIGProcessor:
                 out_file.write(residue)
             for residue in renumbered_waters:
                 out_file.write(residue)
+    ################################################################
     def renumber_important_residues(self, ligand_info):
         pdb_file_path = self.pdb_file[:-4] + f'_{ligand_info}.pdb'
-        important_residues = ['HOH', 'ZN', 'CL', 'NI', 'CO', 'MG']
+        def _read_cofactor_name_from_log(log_path="../FMOPhore.log"):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for s in f:
+                        s = s.strip()
+                        if s.lower().startswith("cofactor:"):
+                            m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})\b', s, re.I)
+                            if m:
+                                return m.group(1).upper()
+            except FileNotFoundError:
+                pass
+            return None
+        residues_names = ['ALA','ARG','ASN','ASP','CYS','GLN','GLU','GLY','HIS','HIE',
+                          'ILE','LEU','LYS','MET','PHE','PRO','SER','THR','TRP','TYR','VAL']
+        _res_set = set(residues_names)
+        _raw_cof = _read_cofactor_name_from_log("../FMOPhore.log")
+        cofactor_name = _raw_cof if (_raw_cof and _raw_cof not in _res_set) else None
+
+        important_residues = ['HOH', 'ZN', 'CL', 'NI', 'CO', 'MG', cofactor_name]
         renumbered_residues = []
         other_residues = []
         ligand_res_number = None

@@ -4,7 +4,7 @@ from Bio.PDB import PDBParser, Selection, Structure, Model, Chain, PDBIO, is_aa,
 import sys
 import os
 import re
-import pymol
+import pymol 
 from pymol import cmd
 import glob
 import shutil
@@ -14,13 +14,20 @@ import csv
 import math
 from pathlib import Path
 import multiprocessing
+import argparse
+import string
 from .FMOPhore_chain_correction import chain_corrector
+from collections import defaultdict, Counter
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
+
 ###################################################################################################
 #  PDBProcessor
 ###################################################################################################
 class PDBProcessor:
-    def __init__(self, pdb_file):
+    def __init__(self, pdb_file, cofactor):
         self.pdb_file = pdb_file
+        self.cofactor = cofactor
     def chain_id_list_all(self):
         return self.chain_id_list
     def ligands_list_all(self):
@@ -28,9 +35,10 @@ class PDBProcessor:
     ################################################################
     chain_id_list = []
     ligands_list  = []
-    def process_complex(self):
+    def process_complex(self, cofactor):
         pdb_lines = self.load_pdb_file()
         pdb_lines = self.filter_lines(pdb_lines)
+        pdb_lines = self.renumber_residues_incrementally(pdb_lines)
         pdb_lines = self.residue_std(pdb_lines)
         pdb_lines = self.rename_LIG(pdb_lines)
         pdb_lines = self.increment_HETATM(pdb_lines)
@@ -38,12 +46,15 @@ class PDBProcessor:
         pdb_lines = self.recenter(pdb_lines)
         pdb_lines = self.load_pdb_file()
         pdb_lines = self.chain_id(pdb_lines)
+        pdb_lines = self.write_cofactor(pdb_lines, cofactor)
+        # self.save_pdb_file(pdb_lines)
         pdb_lines = self.load_pdb_file()
         pdb_lines = self.rechain_LIG(pdb_lines)
+        pdb_lines = self.set_ligand_chain(pdb_lines)
         pdb_lines = self.correct_ligand_chain(pdb_lines)
         pdb_lines = self.remove_duplicate_water_molecules(pdb_lines)
         pdb_lines = self.ligand_charge(pdb_lines)
-        pdb_lines = self.renumber_atoms(pdb_lines)
+        # # pdb_lines = self.renumber_atoms(pdb_lines)
         self.save_pdb_file(pdb_lines)
         pdb_lines = self.pdbfixer()
     ################################################################
@@ -52,28 +63,56 @@ class PDBProcessor:
             return f.readlines()
     ###############################################################
     def filter_lines(self, pdb_lines):
-        excluded_strings = [
-          'HD2 ASP', 'HE2 GLU',
-          'FMT', 'ANISOU',  'NO3',
-          'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 
-          'ACE', 'NMA', 'NME', 'ACT', 'MES', 
-          'OCY', "HA2 PHE", 'SEP', 'TRS',  'CO', 'MLA',
-          ' ZN','PTR',
-          'SAH','TPO', 'IOD', 'NI']
-        pdb_lines = [
-            line for line in pdb_lines
-            if not (any(substr in line for substr in excluded_strings) or
-                line[17:20] in ['CD ',' CD', ' CL', 'CL ', 'NA ', ' NA'] or
-                line[16:17] in ['B', 'C'] or
-                line[26:27] == 'A' or 
-                (line[0:4] == "ATOM" and line[12:16].strip() == 'OXT'))]
-        for i, line in enumerate(pdb_lines):
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'IPA', 'PTR',
+            'T3P', 'WAT', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+        excluded_metals = {'CA', 'NI', 'CO', 'ZN', 'MG'}
+        filtered_lines = []
+        for line in pdb_lines:
+            record_type = line[0:6].strip()
+            resname = line[17:20].strip()
+            chain_id = line[21:22]
+            altloc = line[16:17]
+            atom_name = line[12:16].strip()
+            if (
+                any(substr in line for substr in excluded_strings) or
+                resname in ['CD', 'CL', 'NA'] or
+                altloc in ['B', 'C', 'D', 'E', 'F'] or
+                # line[26:27] == 'A' or
+                (record_type == "ATOM" and atom_name == 'OXT') or
+                (record_type == "HETATM" and resname in excluded_metals)
+            ):
+                continue
+            if line[16:17] == 'A':
+                line = line[:16] + ' ' + line[17:]
+            # All uppercase alphabetic insertion codes
+            insertion_codes_to_strip = set(string.ascii_uppercase)
+            if line[26:27] in insertion_codes_to_strip:
+                line = line[:26] + ' ' + line[27:]
+            filtered_lines.append(line)
+
+        for i, line in enumerate(filtered_lines):
             record_type = line[:6].strip()
             residue_name = line[17:20].strip()
             if record_type == 'HETATM' and residue_name != 'HOH':
                 if line[22].isdigit() or line[22].isalpha():
-                    pdb_lines[i] = line[:22] + ' ' + line[23:]
-        return pdb_lines
+                    line = line[:22] + ' ' + line[23:]
+            if line.startswith('HETATM') and residue_name not in excluded_strings and residue_name != 'HOH':
+                residue_name = line[17:20].strip()
+                resnum_field = line[22:26]
+                resnum_clean = resnum_field.strip()
+                # Replace numeric residue name with 'LIG'
+                if residue_name.isdigit():
+                    line = line[:17] + 'LIG' + line[20:]
+                # Replace 1-digit or 4-digit residue number with 999
+                if resnum_clean.isdigit() and (len(resnum_clean) == 1 or len(resnum_clean) == 4):
+                    line = line[:22] + '{:>4}'.format('999') + line[26:]
+                filtered_lines[i] = line  # Update line after both modifications       
+        return filtered_lines
     ###############################################################
     def residue_std(self, pdb_lines):
         residue_std_lines = []
@@ -97,6 +136,39 @@ class PDBProcessor:
                         new_atom_name = 'HZ3'
                     pdb_lines[i] = line[:12] + f"{new_atom_name:<4}" + line[16:]  # Replace atom name in line
         return pdb_lines
+    ###############################################################
+    def renumber_residues_incrementally(self, pdb_lines):
+        corrected_lines = []
+        prev_res_num = None
+        prev_res_name = None
+        current_chain_id = None
+        res_offset = 0 
+        for line in pdb_lines:
+            if not line.startswith(("ATOM", "HETATM")):
+                corrected_lines.append(line)
+                continue
+            res_name = line[17:20].strip()
+            chain_id = line[21]
+            res_num_str = line[22:26]
+            res_num = int(res_num_str.strip())
+            if chain_id != current_chain_id:
+                current_chain_id = chain_id
+                prev_res_num = res_num
+                prev_res_name = res_name
+                res_offset = 0
+                new_res_num = res_num
+            elif res_num == prev_res_num and res_name != prev_res_name:
+                res_offset += 1
+                new_res_num = res_num + res_offset
+            else:
+                new_res_num = res_num + res_offset
+            prev_res_num = res_num
+            prev_res_name = res_name
+            new_res_str = f"{new_res_num:>4}"
+            new_line = line[:22] + new_res_str + line[26:]
+            corrected_lines.append(new_line)
+        return corrected_lines
+
     ################################################################
     def rename_LIG(self, pdb_lines):
         def is_float(value):
@@ -150,7 +222,7 @@ class PDBProcessor:
                 residue = int(line[22:26].strip())
                 if chain != last_chain:
                     if last_chain is not None:
-                        base_increment += 9  
+                        base_increment += 0  
                     last_chain = chain
                 new_residue = residue + base_increment
                 output_line = line[:22] + f"{new_residue:4}" + line[26:]
@@ -164,7 +236,7 @@ class PDBProcessor:
         for i, line in enumerate(pdb_lines):
             record_type = line[:6].strip()
             if record_type in ['HETATM']:
-                residue_number = line[20:26].strip()
+                residue_number = line[22:26].strip()
                 residue_name = line[17:26].strip()
                 atom_name = line[12:16].strip()
                 unique_identifier = residue_name + atom_name
@@ -258,15 +330,59 @@ class PDBProcessor:
             with open("errors.log", "a") as error_file:
                 error_file.write(error_message + "\n")
             chain_corrector(pdb_file_pattern=self.pdb_file, chain_from_to=chain_ranges_str)
+    ################################################################        
+    def write_cofactor(self, pdb_lines, cof: dict):
+        if pdb_lines is None:
+            with open(self.pdb_file, "r", encoding="utf-8", errors="ignore") as fh:
+                pdb_lines = fh.readlines()
+        if not cof or not cof.get("name"):
+            return pdb_lines
+        target_name = str(cof["name"]).upper().strip()
+        target_resnum = None
+        if cof.get("resnum") not in (None, ""):
+            try:
+                target_resnum = int(cof["resnum"])
+            except (TypeError, ValueError):
+                target_resnum = None
+        candidates = []
+        for line in pdb_lines:
+            if not line.startswith(("ATOM", "HETATM")):
+                continue
+            resname = line[17:20].strip().upper()
+            if resname != target_name:
+                continue
+            chain = line[21]
+            resnum_str = line[22:26].strip()  
+            if not resnum_str.isdigit():
+                continue
+            resnum = int(resnum_str)
+            if target_resnum is None or resnum == target_resnum:
+                candidates.append((resname, chain, resnum))
+        if candidates:
+            if target_resnum is not None:
+                matches = [c for c in candidates if c[2] == target_resnum]
+                chosen = matches[0] if matches else candidates[0]
+            else:
+                from collections import Counter
+                (chain, resnum), _ = Counter((c[1], c[2]) for c in candidates).most_common(1)[0]
+                chosen = (target_name, chain, resnum)
+            name, chain, resnum = chosen
+            chain_out = chain if chain != " " else "_"  
+            with open("FMOPhore.log", "a", encoding="utf-8") as f:
+                f.write(f"cofactor: {name} {chain_out} {resnum} !\n")
+        else:
+            with open("FMOPhore.log", "a", encoding="utf-8") as f:
+                f.write(f"cofactor: {target_name}-_-NA  # not found in PDB\n")
+        return pdb_lines
     ################################################################
     def rechain_LIG(self, pdb_lines):
-        excluded_strings = [
-          'WAT', 'T3P',  'FMT', 'ANISOU', 'NAG' , 'PO4',
-          'PEG', 'GOL', 'BO3', 'ACE', 'PTR','BU3','NAG' , 'PO4',
-          'NMA', 'NME', 'ACT', 'MES', 'OCY', 'SEP', 'CO','MLA',
-          'TPO', 'IOD', 'NI'
-                     , 'SAH', 'MTA'
-        ]
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'IPA', 'PTR',
+            'T3P', 'WAT', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
         for i, hetatm_line in enumerate(pdb_lines):
             if hetatm_line.startswith('HETATM') and hetatm_line[17:20].strip() not in excluded_strings:
                 hetatm_chain_id = hetatm_line[21]
@@ -287,14 +403,14 @@ class PDBProcessor:
                     pdb_lines[i] = hetatm_line[:21] + nearest_chain_id + hetatm_line[22:]         
         return pdb_lines
     # ################################################################
-    def correct_ligand_chain(self, pdb_lines):
-        excluded_strings = [
-          'WAT', 'T3P',  'FMT', 'ANISOU', 'PTR', 'TRS', 'BU3',
-          'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'ACE', 'NAG' , 'PO4',
-          'NMA', 'NME', 'ACT', 'MES', 'OCY', 'SEP', 'CO','MLA',
-          'TPO', 'NI'
-                     , 'SAH', 'MTA'
-        ]
+    def set_ligand_chain(self, pdb_lines):
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'IPA', 'PTR',
+            'T3P', 'WAT', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
         ligands = {}
         for line in pdb_lines:
             if line.startswith("HETATM") and line[17:20].strip() not in excluded_strings:
@@ -347,56 +463,131 @@ class PDBProcessor:
                 ligand = line[17:26]
                 self.chain_id_list.append(chain_id)  
                 self.ligands_list.append(ligand)
-        return pdb_lines    
+        return pdb_lines   
+    ################################################################
+    def correct_ligand_chain(self, pdb_lines):
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'IPA', 'PTR',
+            'T3P', 'WAT', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+
+        self.ligands_list.clear()
+        self.chain_id_list.clear()
+
+        ligand_chain_map = defaultdict(list)
+
+        with open("FMOPhore.log", "r") as log_file:
+            for line in log_file:
+                line = line.strip()
+                if "falls in chain " in line:
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        ligand_name = parts[0].strip()
+                        chain_id = parts[1].strip()
+                        ligand_num = parts[2].strip()
+                        ligand_key = (ligand_name, ligand_num)
+                        ligand_chain_map[ligand_key].append(chain_id)
+        ligand_to_chain = {
+            key: Counter(chains).most_common(1)[0][0]
+            for key, chains in ligand_chain_map.items()
+        }
+        seen = set()
+        for i, line in enumerate(pdb_lines):
+            ligand_name = line[17:20].strip()
+            if line.startswith("HETATM") and ligand_name not in excluded_strings:
+                ligand_name = line[17:20].strip()
+                ligand_num = line[22:26].strip()
+                chain_id = line[21]
+                ligand_key = (ligand_name, ligand_num)
+                if ligand_key in ligand_to_chain:
+                    correct_chain = ligand_to_chain[ligand_key]
+                    if chain_id != correct_chain:
+                        pdb_lines[i] = line[:21] + correct_chain + line[22:]
+                        chain_id = correct_chain  
+                ligand_id = f"{ligand_name} {chain_id} {ligand_num}"
+                if ligand_id not in seen:
+                    seen.add(ligand_id)
+                    self.chain_id_list.append(chain_id)
+                    self.ligands_list.append(ligand_id)
+        return pdb_lines
+
     ################################################################
     def remove_duplicate_water_molecules(self, pdb_lines):
         clean_pdb_lines = []
-        seen_residue_ids = set()  
+        seen_water_residues = set()
+        
         for line in pdb_lines:
-            if line.startswith('HETATM') and line[17:20].strip() == 'HOH':  
-                chain_id = line[21:22].strip()  
-                residue_number = line[22:26].strip()  
-                residue_id = residue_number
-                if residue_id not in seen_residue_ids:
-                    seen_residue_ids.add(residue_id)
+            if line.startswith('HETATM') and line[17:20].strip() == 'HOH':
+                chain_id = line[21].strip()
+                residue_number = line[22:26].strip()
+                atom_name = line[12:16].strip()
+                atom_cords = line[0:55].strip()
+                residue_key = (chain_id, residue_number, atom_name, atom_cords)
+
+                if residue_key not in seen_water_residues:
+                    seen_water_residues.add(residue_key)
                     clean_pdb_lines.append(line)
-            elif line.startswith('TER'):  
-                if len(clean_pdb_lines) > 0 and clean_pdb_lines[-1].startswith('HETATM') and clean_pdb_lines[-1][17:20].strip() == 'HOH':
-                    clean_pdb_lines.append(line)  
+                else:
+                    # Skip duplicate HOH residue atoms
+                    continue
+            elif line.startswith('TER'):
+                # Keep TER only if it's for a water that was preserved
+                if (
+                    len(clean_pdb_lines) > 0 and
+                    clean_pdb_lines[-1].startswith('HETATM') and
+                    clean_pdb_lines[-1][17:20].strip() == 'HOH'
+                ):
+                    clean_pdb_lines.append(line)
             else:
-                clean_pdb_lines.append(line)  
+                clean_pdb_lines.append(line)
+        
         return clean_pdb_lines
     ################################################################
     def ligand_charge(self, pdb_lines):
-        with open("FMOPhore.log", 'r') as log_file:
-            log_lines = log_file.readlines()
-        charge_dict = {'O1+': '+1', 'N1+': '+1', 'O1-': '-1', 'S1-': '-1', 'l1-': '-1', 'N1-': '-1'}
-        ligand_charges = {} 
-        for i, line in enumerate(log_lines):
-            ligand_name = line[:9] 
-            if ligand_name not in ligand_charges:
-                ligand_charges[ligand_name] = 0 
-            for pdb_line in pdb_lines:
-                if pdb_line.startswith('HETATM'):
-                    ligand = pdb_line[17:26].strip()
-                    this_ligand_charge = pdb_line[77:80].strip()
-                    if ligand == ligand_name and this_ligand_charge in charge_dict:
-                        ligand_charges[ligand_name] += int(charge_dict[this_ligand_charge])
-        for ligand_name, charge in ligand_charges.items():
-            for i, line in enumerate(log_lines):
-                if line.startswith("Chain"):
-                    continue
-                elif ligand_name in line and "charge" in line:
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'PTR',
+            'T3P', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA'
+        ]))
+        charge_dict = {'O1+': +1, 'N1+': +1, 'O1-': -1, 'S1-': -1, 'l1-': -1, 'N1-': -1}
+        ligand_charges = {}
+        for line in pdb_lines:
+            if line.startswith("HETATM") and line[17:20].strip() not in excluded_strings:
+                resname = line[17:20].strip()
+                chain = line[21].strip()
+                resnum = line[22:26].strip()
+                key = f"{resname} {chain} {resnum}"
+                charge_label = line[76:80].strip()
+                if charge_label in charge_dict:
+                    ligand_charges.setdefault(key, 0)
+                    ligand_charges[key] += charge_dict[charge_label]
+        with open("FMOPhore.log", 'r') as f:
+            log_lines = f.readlines()
+        updated_lines = []
+        for line in log_lines:
+            stripped = line.strip()
+            if "Chain" in line or "multiple" in line:
+                updated_lines.append(line)
+                continue
+            ligand_key = None
+            for key in ligand_charges:
+                if key in line:
+                    ligand_key = key
                     break
-                elif ligand_name in line and "charge" not in line:
-                    log_lines[i] = line.strip() + f' charge {charge}\n'
-                with open("FMOPhore.log", 'w') as log_file:
-                    log_file.writelines(log_lines)
-        with open("FMOPhore.log", 'r') as log_file:
-            log_lines = log_file.readlines()
-        log_lines = [line for line in log_lines if not (line.startswith(ligand_name) and "charge" not in line)]
-        with open("FMOPhore.log", 'w') as log_file:
-            log_file.writelines(log_lines)
+            if "charge" not in line:
+                if ligand_key:
+                    updated_lines.append(stripped + f" charge {ligand_charges[ligand_key]}\n")
+                else:
+                    updated_lines.append(stripped + " charge 0\n")
+            else:
+                updated_lines.append(line)
+        with open("FMOPhore.log", 'w') as f:
+            f.writelines(updated_lines)
         return pdb_lines
     ################################################################
     def renumber_atoms(self, pdb_lines):
@@ -434,10 +625,26 @@ class PDBProcessor:
             f.writelines(pdb_lines)
     ################################################################
     def pdbfixer(self):
-        pdb_file_path = f"{self.pdb_file[:-4]}.pdb"
-        os.system(f'pdbfixer {pdb_file_path} --output {pdb_file_path} --add-atoms all --keep-heterogens all --add-residues --ph 7.0')
-        with open(pdb_file_path, "r") as file:
-            lines = file.readlines()
+        original_pdb_path = f"{self.pdb_file[:-4]}.pdb"
+        temp_fixed_path = f"{self.pdb_file[:-4]}_fixed.pdb"
+        with open(original_pdb_path, "r") as file:
+            original_lines = file.readlines()
+        hoh_lines = [line for line in original_lines if line.startswith("HETATM") and line[17:20] == "HOH"]
+        hoh_ter_lines = [line for line in original_lines if line.startswith("TER") and "HOH" in line]
+        hetatm_non_hoh = [line for line in original_lines if line.startswith("HETATM") and line[17:20] != "HOH"]
+        conect_lines = [line for line in original_lines if line.startswith("CONECT")]
+        ter_lines = [line for line in original_lines if line.startswith("TER") and "HOH" not in line]
+        end_line = [line for line in original_lines if line.strip() == "END"]
+        os.system(
+            f'pdbfixer {original_pdb_path} --output {temp_fixed_path} '
+            f'--add-atoms=heavy --keep-heterogens=all --add-residues --ph=7.0'
+        )
+        with open(temp_fixed_path, "r") as file:
+            fixed_lines = file.readlines()
+        cleaned_lines = [line for line in fixed_lines if line.startswith("ATOM") or line.startswith("TER")]
+        cleaned_lines.extend(hoh_lines)
+        cleaned_lines.extend(hoh_ter_lines)
+        cleaned_lines.extend(hetatm_non_hoh)
         amino_acid_mapping = {
             " NZ  LYS": "N1+",
             " OD2 ASP": "O1-",
@@ -445,30 +652,46 @@ class PDBProcessor:
             " OE2 GLU": "O1-"
         }
         his_line_count = {}
-        for line in lines:
+        for line in cleaned_lines:
             if "HIS" in line[17:20]:
-                chain_id = line[20:21]
-                residue_id = line[21:26]
-                his_line_count[residue_id] = his_line_count.get(residue_id, 0) + 1
-        for residue_id, count in his_line_count.items():
+                chain_id = line[21]
+                residue_id = line[22:26]
+                key = f"{chain_id}_{residue_id}"
+                his_line_count[key] = his_line_count.get(key, 0) + 1
+        for key, count in his_line_count.items():
             if count == 18:
+                chain_id, residue_id = key.split("_")
                 amino_acid_mapping[f" NE2 HIS{chain_id}{residue_id}"] = "N1+"
-        final_modified_lines = []
-        for line in lines:
-            if line[12:20] in amino_acid_mapping:
-                modified_line = line[:77] + amino_acid_mapping[line[12:20]] + line[80:]
-                final_modified_lines.append(modified_line)
-            elif line[12:26] in amino_acid_mapping:
-                modified_line = line[:77] + amino_acid_mapping[line[12:26]] + line[80:]
-                final_modified_lines.append(modified_line)
+        final_lines = []
+        for line in cleaned_lines:
+            atom_key_short = line[12:20]
+            atom_key_long = line[12:26]
+            if atom_key_short in amino_acid_mapping:
+                modified_line = line[:77] + amino_acid_mapping[atom_key_short] + line[80:]
+                final_lines.append(modified_line)
+            elif atom_key_long in amino_acid_mapping:
+                modified_line = line[:77] + amino_acid_mapping[atom_key_long] + line[80:]
+                final_lines.append(modified_line)
             else:
-                final_modified_lines.append(line)
-        with open(pdb_file_path, "w") as file:
-            file.writelines(final_modified_lines)
+                final_lines.append(line)
+        for line in ter_lines:
+            if line not in final_lines:
+                final_lines.append(line)
+        final_lines.extend(conect_lines)
+        if end_line:
+            final_lines.append(end_line[0])
+        else:
+            final_lines.append("END\n")
+        with open(original_pdb_path, "w") as file:
+            file.writelines(final_lines)
+        os.remove(temp_fixed_path)
 ###################################################################################################
 if __name__ == "__main__":
     """
-    FMOPhore V.0.1 - PDBProcessor - Copyright "©" 2024, Peter E.G.F. Ibrahim.
+    FMOPhore V 0.1 - PDBProcessor - Copyright "©" 2024, Peter E.G.F. Ibrahim.
     """
-    pdb_processor = PDBProcessor(self.pdb_file)
-    pdb_processor.process_complex()
+    parser = argparse.ArgumentParser(description="FMOPhore Fragmention PDBProcessor")
+    parser.add_argument("-pdb", "--pdb_file", type=str, required=True, help="Path to the PDB file")
+    args = parser.parse_args()
+    pdb_processor = PDBProcessor(args.pdb_file, args.cofactor)
+    pdb_processor.process_complex(args.cofactor)

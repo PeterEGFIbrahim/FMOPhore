@@ -8,9 +8,10 @@ from .FMOPhore_cutoff import CutoffProcessor
 from .FMOPhore_split import SplitProcessor
 from .FMOPhore_ph4 import Pharmacophores
 # from .FMOPhore_Fragmention_com import Fragmention_Processor
-# from .FMOPhore_complex_analysis import ComplexAnalysis
 from .FMOPhore_analysis import Analysis
-# from .FMOPhore_library_analysis import LibAnalysis
+from .FMOPhore_analysis_complex import ComplexAnalysis
+from .FMOPhore_analysis_library import LibAnalysis
+from .FMOPhore_utility import EnvironmentGuard
 
 __all__ = [
     "FMOPhore_download_pdb",
@@ -23,7 +24,8 @@ __all__ = [
     "SplitProcessor",
     "Pharmacophores",
     # "Fragmention_Processor",
-    # "ComplexAnalysis",
+    "ComplexAnalysis",
     "Analysis",
-    # "LibAnalysis",
+    "LibAnalysis",
+    "EnvironmentGuard",
 ]

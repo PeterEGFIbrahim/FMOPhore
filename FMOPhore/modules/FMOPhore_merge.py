@@ -1,6 +1,8 @@
 import os
 import argparse
 import glob
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
 
 def merge_ligs_prot(protein_path, ligands_path, output_dir):
     """

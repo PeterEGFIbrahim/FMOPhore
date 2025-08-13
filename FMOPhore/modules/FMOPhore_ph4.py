@@ -7,6 +7,10 @@ import shutil
 import csv
 import subprocess
 import math
+import argparse
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
+
 ###############################################################################################################################
 #                                           process binding site analysis
 ###############################################################################################################################
@@ -27,12 +31,31 @@ class Pharmacophores:
             return f.readlines()
     ################################################################
     def rename_LIG(self, pdb_lines):
-        excluded_strings = ['FMT', 'IOD', 'HOH', 'WAT', 'T3P', 'CL','BU3',
-                            'MG', 'ZN','PEG', 'DMS', 'GOL', 'BO3', 
-                            'EDO', 'SO4', 'ACE', 'NMA', 'NME', 'ACT', 
-                            'MES', 'OCY','FMT','PEG','SEP', 'BME', 'CSO', 
-                            'IMD','TPO', 'TCE', 'MDP', 'NI'
-                            ]
+        def _read_cofactor_name_from_log(log_path="../FMOPhore.log"):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for s in f:
+                        s = s.strip()
+                        if s.lower().startswith("cofactor:"):
+                            m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})\b', s, re.I)
+                            if m:
+                                return m.group(1).upper()
+            except FileNotFoundError:
+                pass
+            return None
+        residues_names = ['ALA','ARG','ASN','ASP','CYS','GLN','GLU','GLY','HIS','HIE',
+                          'ILE','LEU','LYS','MET','PHE','PRO','SER','THR','TRP','TYR','VAL']
+        _res_set = set(residues_names)
+        _raw_cof = _read_cofactor_name_from_log("../FMOPhore.log")
+        cofactor_name = _raw_cof if (_raw_cof and _raw_cof not in _res_set) else None
+
+        excluded_strings = sorted(set([
+            'HD2 ASP', 'HA2 PHE', 'FMT', 'ANISOU', 'BU3', 'NAG', 'PO4',
+            'PEG', 'GOL', 'BO3', 'EDO', 'SO4', 'NO3', 'ACE', 'NMA', 'NME',
+            'ACT', 'MES', 'TRS', 'OCY', 'SEP', 'BME', 'CSO', 'IMD', 'TPO',
+            'TCE', 'MDP', 'IOD', 'NI', 'IPA', 'CO', 'ZN', 'CL', 'PTR',
+            'T3P', 'WAT', 'HOH', 'MG', 'DMS', 'EOH', 'GZ6', 'PCA', 'ACY', 'MLA', cofactor_name
+        ]))
         for i, line in enumerate(pdb_lines):
             if line.startswith('HETATM') and line[17:20].strip() not in excluded_strings:
                 pdb_lines[i] = line[:22] + '9999' + line[26:]
@@ -101,12 +124,13 @@ class Pharmacophores:
         destination_folder = 'FMOPhore'
         for file_path in files_to_move:
             shutil.move(file_path, destination_folder)
-        os.chdir('FMOPhore')
+        os.chdir('FMOPhore') 
     # ################################################################################################################################
         file_paths = ['dpout_fpocketp.txt',
                      'dpout_fpocketnp.txt',
-                     'dpout_explicitp.txt',
-                     'stats_p.txt']
+                     'dpout_explicitp.txt'
+                     # 'stats_p.txt'
+                     ]
         for file_path in file_paths:
             with open(file_path, 'r') as file:
                 lines = file.readlines()
@@ -612,18 +636,37 @@ class Pharmacophores:
             file.writelines(updated_data_lig)
         input_file_path = data_file_path  
         output_file_path = "Ph4_3D.txt"  
-        c_with_number_pattern = re.compile(r'C\d+')
+        # c_with_number_pattern = re.compile(r'C\d+')
+        # with open(input_file_path, 'r') as input_file, open(output_file_path, 'w') as output_file:
+        #     for line in input_file:
+        #         if "pi-Stacking" in line:
+        #             line = line.strip() + "\tPi\n"
+        #         elif "pi-Cation_Interactions" in line and ("Pi" not in line):
+        #             line = line.strip() + "\tPi\n"
+        #         elif "pi-Cation_Interactions" in line and ("Pi" in line and "N" not in line and not c_with_number_pattern.search(line)):
+        #             line = line.strip() + "\tN\n"
+        #         elif "Salt_Bridges" in line and line.strip().endswith("Sa"):
+        #             line = line.strip() + "\tO\n"
+        #         output_file.write(line)
+
+        c_atom_pattern = re.compile(r'\bC[\w\d]+\b')
         with open(input_file_path, 'r') as input_file, open(output_file_path, 'w') as output_file:
             for line in input_file:
+                stripped = line.strip()
                 if "pi-Stacking" in line:
-                    line = line.strip() + "\tPi\n"
-                elif "pi-Cation_Interactions" in line and ("Pi" not in line):
-                    line = line.strip() + "\tPi\n"
-                elif "pi-Cation_Interactions" in line and ("Pi" in line and "N" not in line and not c_with_number_pattern.search(line)):
-                    line = line.strip() + "\tN\n"
-                elif "Salt_Bridges" in line and line.strip().endswith("Sa"):
-                    line = line.strip() + "\tO\n"
-                output_file.write(line)
+                    output_file.write(stripped + "\tPi\n")
+                elif "pi-Cation_Interactions" in line and "Pi" not in line:
+                    output_file.write(stripped + "\tPi\n")
+                elif ("pi-Cation_Interactions" in line and 
+                      "Pi" in line and 
+                      "N" not in line and 
+                      not c_atom_pattern.search(line)):
+                    output_file.write(stripped + "\tN\n")
+                elif "Salt_Bridges" in line and stripped.endswith("Sa"):
+                    output_file.write(stripped + "\tO\n")
+                else:
+                    output_file.write(line)
+
         os.remove(f"data.txt")
         os.remove(f"modified_file.txt")
         ###################################################################################################
@@ -647,7 +690,7 @@ class Pharmacophores:
                         name = atom_mapping[original_name]
                     else:
                         name = original_name
-                    coordinates = columns[6:9]
+                    coordinates = columns[3:6]
                     output_file.write(f"{name}, {','.join(coordinates)}\n")
         input_file_path = 'Ph4_3D.txt'  
         output_file_path = f'{self.pdb_file[:-4]}_ph4_3D.txt'  
@@ -665,7 +708,10 @@ class Pharmacophores:
 ################################################################################################################################
 if __name__ == "__main__":
     """
-    FMOPhore V.0.1 - Pharmacophores - Copyright "©" 2024, Peter E.G.F. Ibrahim.
+    FMOPhore V 0.1 - LibAnalysis - Copyright "©" 2024, Peter E.G.F. Ibrahim.
     """
-    pdb_processor = Pharmacophores(self.pdb_file)
+    parser = argparse.ArgumentParser(description="FMOPhore Fragmention Pharmacophores")
+    parser.add_argument("-pdb", "--pdb_file", type=str, required=True, help="Path to the PDB file")
+    args = parser.parse_args()
+    pdb_processor = Pharmacophores(args.pdb_file)
     pdb_processor.run_Pharmacophores()

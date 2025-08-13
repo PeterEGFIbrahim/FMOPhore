@@ -2,6 +2,8 @@ import argparse
 import glob
 import os
 import shutil
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
 
 def renumber_pdb(input_filename, output_filename, chain_start, chain_end):
     current_chain_id = None

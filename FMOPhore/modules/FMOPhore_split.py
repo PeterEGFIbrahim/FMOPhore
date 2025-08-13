@@ -4,12 +4,18 @@ from Bio.PDB import PDBParser, Selection, Structure, Model, Chain, PDBIO, is_aa,
 import sys
 import os
 import re
-import pymol
+import pymol 
 from pymol import cmd
 import glob
 import shutil
 import Bio.PDB
 import math
+import argparse
+from .FMOPhore_utility import EnvironmentGuard
+from rdkit import Chem
+from rdkit.Chem import AllChem
+# EnvironmentGuard().enforce()
+
 ###################################################################################################
 def distance(coord1, coord2):
     return np.linalg.norm(coord1 - coord2) 
@@ -61,6 +67,27 @@ class SplitProcessor:
             return f.readlines()
     ################################################################
     def generate_cutoff_pdb_complex(self, distance_cutoff, ligand_info, same_target=None):
+        def _read_cofactor_name_from_log(log_path="../FMOPhore.log"):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for s in f:
+                        s = s.strip()
+                        if s.lower().startswith("cofactor:"):
+                            # handles both "cofactor: SAH A 701" and "cofactor: SAH-A-701"
+                            m = re.search(r'cofactor:\s*([A-Za-z0-9]{1,3})\b', s, re.I)
+                            if m:
+                                return m.group(1).upper()
+            except FileNotFoundError:
+                pass
+            return None
+
+        residues_names = ['ALA','ARG','ASN','ASP','CYS','GLN','GLU','GLY','HIS','HIE',
+                          'ILE','LEU','LYS','MET','PHE','PRO','SER','THR','TRP','TYR','VAL']
+        _res_set = set(residues_names)
+
+        _raw_cof = _read_cofactor_name_from_log("../FMOPhore.log")
+        cofactor_name = _raw_cof if (_raw_cof and _raw_cof not in _res_set) else None
+
         if same_target:
             residue_file = '../../library_analysis/residues/residues.txt'
             residues_to_select = []
@@ -95,7 +122,7 @@ class SplitProcessor:
         for model in renumbered_structure:
             for chain in model:
                 for residue in chain:
-                    if residue.get_id()[0] == ' ' or residue.get_id()[0] == 'H' or residue.get_resname() == 'HOH':
+                    if residue.get_id()[0] == ' ' or residue.get_id()[0] == 'H' or residue.get_resname() == 'HOH' or residue.get_resname() == cofactor_name:
                         for atom1 in ligand:
                             for atom2 in residue:
                                 dist = atom1 - atom2 
@@ -130,7 +157,7 @@ class SplitProcessor:
                         if chain.get_id() == residue_chain_id:
                             try:
                                 residue = chain[residue_number]
-                                if residue.get_id()[0] == ' ' or residue.get_id()[0] == 'H' or residue.get_resname() == 'HOH':
+                                if residue.get_id()[0] == ' ' or residue.get_id()[0] == 'H' or residue.get_resname() == 'HOH' or residue.get_resname() == cofactor_name:
                                     found = True
                                     if residue_number not in selected_residues:
                                         residues.append((residue_name, residue_chain_id, residue_number, residue))
@@ -192,7 +219,6 @@ class SplitProcessor:
                     pdb_line = f"ATOM  {atom_serial_number:5d} {atom_name:<4} {residue_object.resname:3} {chain_id:1}{residue_number:4d}    {atom_coordinates[0]:8.3f}{atom_coordinates[1]:8.3f}{atom_coordinates[2]:8.3f}{1.00:6.2f}{0.00:6.2f}          {atom_name[0]:>2}\n"
                     pdb_file.write(pdb_line)
             for atom in ligand:
-                print(atom)
                 atom_name = atom.name
                 atom_serial_number = atom.serial_number
                 atom_coordinates = atom.coord
@@ -203,7 +229,8 @@ class SplitProcessor:
             other_lines = []
             with open(input_file, 'r') as infile:
                 for line in infile:
-                    if line[17:20] == "HOH":
+                    resname = line[17:20].strip().upper()
+                    if resname == "HOH" or resname == cofactor_name:
                         line = line[:0] + "HETATM" + line[6:]
                     if line.startswith("HETATM"):
                         hetatm_lines.append(line)
@@ -255,24 +282,62 @@ class SplitProcessor:
             writer.set_structure(renumbered_structure)
             writer.save(f)
     ################################################################
+    # def pymol_protein_add_H(self, distance_cutoff, ligand_info): 
+    #     folder_path = '.' 
+    #     original_PDB_file = glob.glob(self.pdb_file[:-4] + f"_FMO_" + str(self.distance_cutoff) + ".pdb")
+    #     for file in original_PDB_file:
+    #         new_filename = file[:-4] + '_H.pdb'
+    #         shutil.copy(file, new_filename)
+    #         ligand_line = next(line for line in open(new_filename) if line[17:20].strip() == 'LIG')
+    #         cmd.load(new_filename)
+    #         cmd.set_name(new_filename.split('.')[0], "bla")
+    #         cmd.select('mysele', 'name C')
+    #         cmd.h_add("mysele")
+    #         # cmd.select('mysele', 'name CB')
+    #         # cmd.h_add("mysele")
+    #         cmd.select('mysele', 'name N')
+    #         cmd.h_add('mysele')
+    #         cmd.select('mysele', 'resn LIG and not name CL* and not name N* and not name O*')
+    #         cmd.h_add('mysele')
+    #         cmd.save(new_filename)
+
     def pymol_protein_add_H(self, distance_cutoff, ligand_info): 
-        folder_path = '.' 
-        original_PDB_file = glob.glob(self.pdb_file[:-4] + f"_FMO_" + str(self.distance_cutoff) + ".pdb")
-        for file in original_PDB_file:
+        original_pdb_files = glob.glob(self.pdb_file[:-4] + f"_FMO_{distance_cutoff}.pdb")
+        for file in original_pdb_files:
             new_filename = file[:-4] + '_H.pdb'
             shutil.copy(file, new_filename)
-            ligand_line = next(line for line in open(new_filename) if line[17:20].strip() == 'LIG')
-            cmd.load(new_filename)
-            cmd.set_name(new_filename.split('.')[0], "bla")
-            cmd.select('mysele', 'name C')
-            cmd.h_add("mysele")
-            # cmd.select('mysele', 'name CB')
-            # cmd.h_add("mysele")
-            cmd.select('mysele', 'name N')
-            cmd.h_add('mysele')
-            cmd.select('mysele', 'resn LIG and not name CL* and not name N* and not name O*')
-            cmd.h_add('mysele')
-            cmd.save(new_filename)
+            # Load structure into PyMOL
+            cmd.reinitialize() # Clear any previous session
+            cmd.load(new_filename, "mol")
+            # Only select ATOM records (i.e., standard protein atoms)
+            # Select backbone C and N atoms from protein (ATOM entries only)
+            cmd.select("protein_c", "model mol and polymer.protein and name C")
+            cmd.h_add("protein_c")
+            cmd.select("protein_n", "model mol and polymer.protein and name N")
+            cmd.h_add("protein_n")
+            cmd.save(new_filename, "mol")
+
+    # def pymol_protein_add_H(self, distance_cutoff, ligand_info):
+    #     # Locate the original file
+    #     input_files = glob.glob(self.pdb_file[:-4] + f"_FMO_{distance_cutoff}.pdb")
+    #     if not input_files:
+    #         raise FileNotFoundError("Input PDB file not found.")
+    #     for input_file in input_files:
+    #         output_file = input_file[:-4] + '_H.pdb'
+    #         # Copy the original file for safety (optional)
+    #         shutil.copy(input_file, output_file)
+    #         # Load without sanitization to preserve coordinates
+    #         mol = Chem.MolFromPDBFile(output_file, removeHs=False, sanitize=False)
+    #         if mol is None:
+    #             raise ValueError(f"Could not parse the PDB file: {output_file}")
+    #         # Add hydrogens, preserving original coordinates
+    #         mol_with_H = Chem.AddHs(mol, addCoords=True)
+    #         # ✅ Do NOT call AllChem.EmbedMolecule — it will override coordinates
+    #         # ✅ Coordinates are already present, just extend to added Hs
+    #         # Save the result
+    #         Chem.MolToPDBFile(mol_with_H, output_file)
+    #         print(f"Hydrogens added with original coordinates preserved: {output_file}")
+
     ################################################################
     def modify_complex(self, distance_cutoff, ligand_info):
         f2_mod_filename = self.pdb_file[:-4] + f"_FMO_" + str(self.distance_cutoff) + "_H.pdb"    
@@ -515,10 +580,10 @@ class SplitProcessor:
             new_f2_lines.append(new_f2_line)
         with open(f"{self.pdb_file[:-4]}_FMO_lig_H.pdb", 'w') as f:
             f.writelines(new_f2_lines)
-################################################################################################################################
+###################################################################################################
 if __name__ == "__main__":
     """
     FMOPhore V.0.1 - SplitProcessor - Copyright "©" 2024, Peter E.G.F. Ibrahim.
     """
-    pdb_processor = SplitProcessor(self.pdb_file)
-    pdb_processor.split_complex()
+    LIG_processor = SplitProcessor(args.pdb_file)
+    LIG_processor.split_complex()

@@ -13,161 +13,22 @@ from numpy import nan
 import glob
 from rdkit import Chem
 from rdkit.Chem import Draw
-from PIL import Image
 import argparse
-import pandas as pd
 from tabulate import tabulate
 from PIL import Image, ImageDraw, ImageFont
 import math
-import argparse
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
 
 class Analysis:
-    def __init__(self, pdb_file, Binding_Energy=False):
+    def __init__(self, pdb_file, Binding_Energy=False, FE_score=False):
         self.pdb_file = pdb_file
         self.Binding_Energy = Binding_Energy
+        self.FE_score = FE_score
+    ###################################################################################################
+    # create Ph4 + FMO file
+    ###################################################################################################
     def analyze(self):
-###################################################################################################
-        if self.Binding_Energy:
-            with open('complex_energy.txt', 'r') as complex_file, \
-                 open('protein_energy.txt', 'r') as protein_file, \
-                 open('ligand_energy.txt', 'r') as ligand_file:
-                complex_energy_line = complex_file.readline()
-                complex_energy_match = re.search(r'-?\d+\.\d+', complex_energy_line)
-                complex_energy = float(complex_energy_match.group())
-                protein_energy_line = protein_file.readline()
-                protein_energy_match = re.search(r'-?\d+\.\d+', protein_energy_line)
-                protein_energy = float(protein_energy_match.group())
-                ligand_energy_line = ligand_file.readline()
-                ligand_energy_match = re.search(r'-?\d+\.\d+', ligand_energy_line)
-                ligand_energy = float(ligand_energy_match.group())
-            binding_energy = complex_energy - protein_energy - ligand_energy
-            with open('Binding_Energy.txt', 'w') as f:
-                f.write("Binding Energy (ΔE) = (E_Complex) − (E_Protein) − (E_Ligand) = {:.2f} kcal/mol\n".format(binding_energy))
-        ###################################################################################################
-        df = pd.read_csv('totals.csv')
-        df = pd.DataFrame(df)
-        df = df.T.reset_index()
-        df.index.name = None
-        df.columns = df.iloc[0]
-        df = df.iloc[1:]
-        table = tabulate(df, headers=['Energy', 'kcal/mol'])
-        gray_table = table.replace('\n', '\n\033[1;30m') 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.axis('off')
-        box_width = 0.4
-        box_height = 0.05
-        y = 0.8  
-        for i, row in enumerate(table.split('\n')):
-            if 'Energy' in row:
-                bbox = dict(facecolor='lightgray', boxstyle='square', pad=box_width/2)
-            elif '---' in row:
-                continue
-            else:
-                bbox = dict(facecolor='white', boxstyle='square', pad=box_width/2)
-            ax.text(0.1, y-(i*box_height), row, ha='left', va='top', fontsize=12, bbox=bbox,
-                    family='monospace')
-        fig.savefig('Interaction_Energy.png', bbox_inches='tight')
-        plt.close()
-        ###################################################################################################
-        with open('total_average.txt', 'r') as infile, open('DA_FMO.txt', 'w') as outfile:
-            sum_delta_E = 0
-            count = 0
-            for line in infile:
-                if "dtype: float64" in line or line.strip() == "" or "Total_average" in line or "Fragment" in line:
-                    continue
-                columns = line.strip().split()
-                try:
-                    value = float(columns[1])
-                    sum_delta_E += value
-                    count += 1
-                except ValueError:
-                    print(f"Skipping line due to conversion error: {line.strip()}")
-                    continue
-            if count > 0:
-                avg_delta_E = sum_delta_E / count
-                outfile.write("DA-FMO Interaction Energy (ΔE) = ∑(ΔE_i^FMO) / N = {:.2f} kcal/mol\n".format(avg_delta_E))
-            else:
-                outfile.write("No valid data to calculate the average ΔE.\n")
-        ###################################################################################################
-        with open('totals.csv', 'r') as infile:
-            reader = csv.reader(infile)
-            next(reader)  
-            row = next(reader)  
-            delta_E = float(row[1])  
-        with open('FMO.txt', 'w') as outfile:
-            outfile.write("FMO Interaction Energy (∆E) = (∆E)_ij^es + (∆E)_ij^ex + (∆E)_ij^(ct+mix) + (∆E)_ij^DI + (∆E)_^Gsol = {:.2f} kcal/mol\n".format(delta_E))
-        ###################################################################################################
-        if self.Binding_Energy:
-            BE = []
-            with open('Binding_Energy.txt', 'r') as infile:
-                for line in infile:
-                    if line.startswith('Binding'):
-                        binding_energy_str = re.findall(r'[-+]?\d*\.\d+|\d+', line)[0]
-                        binding_energy = float(binding_energy_str)
-            ΔG = []
-            logP = []
-            with open('Desc.txt', 'r') as infile:
-                for line in infile:
-                    if line.startswith('logD='):
-                        logD = line.strip().split('=')[1].strip()
-                    elif line.startswith('logP='):
-                        logP = line.strip().split('=')[1].strip()
-                    elif line.startswith('nRB='):
-                        nRB = float(line.strip().split('=')[1].strip())
-                    ΔG = delta_E - nRB
-                    ΔG = binding_energy - nRB
-            with open('Affinity.txt', 'w') as outfile:
-                outfile.write("Affinity = aFMO(∆E) + logP + g = a({:.2f}) + b({}) + g \n".format(delta_E, logP))
-                outfile.write("ref = https://doi.org/10.1021/acsomega.2c08132 = .\n")
-                outfile.write("- = -------- = -\n")
-                outfile.write("- = -------- = -\n")
-                outfile.write("TΔS = n(Rotatable Bonds) = {} \n".format(nRB))
-                outfile.write("ΔG = (ΔE) - (TΔS) = {:.2f} kcal/mol\n".format(ΔG))
-                outfile.write("ref = https://doi.org/10.1186/1758-2946-3-2 = .\n")
-                outfile.write("- = -------- = -\n")
-        ###################################################################################################
-            with open('Energies.txt', 'w') as outfile:
-                for filename in ['Binding_Energy.txt', 'FMO.txt', 'DA_FMO.txt', 'Affinity.txt']:
-                # for filename in ['Binding_Energy.txt', 'FMO.txt', 'DA_FMO.txt']:
-                    with open(filename, 'r') as infile:
-                        outfile.write(infile.read())
-                    outfile.write('- = -------- = -\n')
-        ###################################################################################################
-        else:
-            with open('Energies.txt', 'w') as outfile:
-                for filename in ['FMO.txt', 'DA_FMO.txt']:
-                # for filename in ['Binding_Energy.txt', 'FMO.txt', 'DA_FMO.txt']:
-                    with open(filename, 'r') as infile:
-                        outfile.write(infile.read())
-                    outfile.write('- = -------- = -\n')
-        ###################################################################################################
-        with open("Energies.txt", "r") as infile:
-            lines = infile.readlines()
-        lines = [line.strip() for line in lines if line.strip() != "- = -------- = -"]
-        data = [line.split(" = ") for line in lines]
-        df = pd.DataFrame(data, columns=["Method", "Equation","kcal/mol"])
-        # print(df.to_string(index=False))
-        table = df.to_string(index=False)
-        table = tabulate(df, headers=["Method", "Equation","kcal/mol"])
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.axis('off')
-        box_width = 0.4
-        box_height = 0.05
-        y = 0.8  
-        for i, row in enumerate(table.split('\n')):
-            if 'ref' in row:
-                bbox = dict(facecolor='lightgray', boxstyle='square', pad=box_width/2)
-            elif '---' in row:
-                continue
-            else:
-                bbox = dict(facecolor='white', boxstyle='square', pad=box_width/2)
-            ax.text(0.1, y-(i*box_height), row, ha='left', va='top', fontsize=12, bbox=bbox,
-                    family='monospace')
-        fig.savefig('Energies.png', bbox_inches='tight')
-        plt.close()
-        ###################################################################################################
-        # create Ph4 + FMO file
-        ###################################################################################################
         def compare_files(file1, file2, output_file):
             with open(file1, 'r') as f1, open(file2, 'r') as f2, open(output_file, 'w') as output:
                 lines1 = f1.readlines()
@@ -187,10 +48,98 @@ class Analysis:
                         formatted_values1 = [f"{float(val):8.3f}" for val in values1[1:-3]]
                         bond_type = values1[-3:-1]
                         output.write(line2 + '\t' + ''.join(formatted_values1) + '\t' + '\t'.join(bond_type) + '\t' + ''.join(values1[-1]) + '\n')
-        file1_path = '../FMOPhore/Ph4_3D.txt'
-        file2_path = 'Binding_site_energies.txt'
-        output_file_path = '../FMOPhore/Ph4_3D_FMO.txt'
-        compare_files(file1_path, file2_path, output_file_path)
+        ###################################################################################################
+        def extract_prefix(pdb_file):
+            base_name = os.path.basename(pdb_file)
+            return base_name.split("FMO")[0]  
+
+        def read_pdb_coordinates(fragment_pdb_files):
+            pdb_data = {}  
+            for pdb_file in fragment_pdb_files:
+                with open(pdb_file, 'r') as f:
+                    for line in f:
+                        if line.startswith("HETATM"):  
+                            cols = line.split()
+                            x, y, z = map(float, [cols[5], cols[6], cols[7]])  
+                            pdb_data.setdefault(pdb_file, []).append((x, y, z, pdb_file))
+            return pdb_data
+
+        def find_nearest_pdb(lig_x, lig_y, lig_z, pdb_data):
+            nearest_pdb = None
+            min_distance = float('inf')
+            for pdb_file, coordinates in pdb_data.items():
+                for x, y, z, fragment in coordinates:
+                    distance = math.sqrt((x - lig_x) ** 2 + (y - lig_y) ** 2 + (z - lig_z) ** 2)
+                    if distance < min_distance:
+                        min_distance = distance
+                        nearest_pdb = pdb_file
+            return nearest_pdb, min_distance
+
+        def find_matching_pdb(lig_x, lig_y, lig_z, pdb_data, residue, tolerance=0.1):
+            for pdb_file, coordinates in pdb_data.items():
+                for x, y, z, fragment in coordinates:
+                    if abs(x - lig_x) <= tolerance and abs(y - lig_y) <= tolerance and abs(z - lig_z) <= tolerance:
+                        return pdb_file, residue  # Exact match found
+            nearest_pdb, min_distance = find_nearest_pdb(lig_x, lig_y, lig_z, pdb_data)
+            if nearest_pdb:
+                return nearest_pdb, residue  # Assign to the nearest PDB file
+            return None, None
+
+        def compare_files_frags(ph4_file, fragment_pdb_files, binding_energy_files, output_file):
+            pdb_data = read_pdb_coordinates(fragment_pdb_files)
+            binding_energies = {} 
+            for energy_file in binding_energy_files:
+                fragment_pdb_file = energy_file.replace("_Binding_site_energies.txt", ".pdb")  
+                with open(energy_file, 'r') as f:
+                    lines = f.readlines()[1:]  
+                    for line in lines:
+                        values = line.split()
+                        residue = values[0]
+                        binding_energies[(fragment_pdb_file, residue)] = values[1:]   
+            with open(ph4_file, 'r') as f1, open(output_file, 'w') as output:
+                lines1 = f1.readlines()
+                output.write("Fragment\tTotal\tEes\tEex\tEct+mix\tEdisp\tGsol\tdistance\tAngle\tLIG.x\tLIG.y\tLIG.z\tPROT.x\tPROT.y\tPROT.z\tBond_type\tprot_atom_id\tlig_atom_id\tMatched_PDB\n")
+                for line1 in lines1[1:]:  
+                    values1 = line1.split()
+                    lig_x, lig_y, lig_z = map(float, values1[3:6])  
+                    residue = values1[0]  
+                    bond_type = values1[9]  
+                    matched_pdb, matched_fragment = find_matching_pdb(lig_x, lig_y, lig_z, pdb_data, residue)
+                    if matched_pdb is None and "pi" in bond_type.lower():
+                        matched_pdb, _ = find_nearest_pdb(lig_x, lig_y, lig_z, pdb_data)
+                    energy_values = binding_energies.get((matched_pdb, residue), ["N/A"] * 6)
+                    output.write("{}\t{}\t{}\t{}\n".format(
+                        residue, 
+                        '\t'.join(energy_values), 
+                        '\t'.join(values1[1:]), 
+                        matched_pdb if matched_pdb else "Not_Found"
+                    ))
+        if self.FE_score:
+            prefix = extract_prefix(self.pdb_file)
+            fragment_pdb_files_all = sorted(glob.glob(f"{prefix}FMO_lig_H_frag*_H_FE.pdb"))
+            fragment_pdb_files = []
+            binding_energy_files = []
+            for frag_pdb in fragment_pdb_files_all:
+                frag_index = os.path.basename(frag_pdb).split('_H_FE.pdb')[0]
+                energy_file = f"{frag_index}_H_FE_Binding_site_energies.txt"
+                if os.path.exists(energy_file):
+                    fragment_pdb_files.append(frag_pdb)
+                    binding_energy_files.append(energy_file)
+                else:
+                    print(f"⚠️ Warning: Missing energy file for {frag_pdb}, skipping.")
+            # Proceed if at least one match is found
+            if fragment_pdb_files and binding_energy_files:
+                ph4_file_path = '../FMOPhore/Ph4_3D.txt'
+                output_file_path = '../FMOPhore/Ph4_3D_FMO.txt'
+                compare_files_frags(ph4_file_path, fragment_pdb_files, binding_energy_files, output_file_path)
+            else:
+                print("❌ No valid fragment-energy pairs found.")        
+
+        else:
+            file1_path = '../FMOPhore/Ph4_3D.txt'
+            file2_path = f'{self.pdb_file[:-4]}_Binding_site_energies.txt'
+            output_file_path = '../FMOPhore/Ph4_3D_FMO.txt'
+            compare_files(file1_path, file2_path, output_file_path)
         ###################################################################################################
         os.chdir("../FMOPhore/")
         cwd = os.getcwd()
@@ -201,7 +150,7 @@ class Analysis:
         selected = df_map_total[df_map_total[f"{self.pdb_file[:-4]}"] >= -400]
         selected.set_index('Fragment', inplace=True)
         selected = selected.T
-        plt.style.use('seaborn-darkgrid')
+        sns.set_style('darkgrid')
         plt.figure(figsize=(20, 10))
         ax = sns.heatmap(selected, linewidths=0.5, cmap='RdYlGn', center=0, fmt=".3f")
         cbar = ax.collections[0].colorbar
@@ -212,11 +161,14 @@ class Analysis:
         plt.tight_layout(pad=2)
         filename = os.path.join(cwd, 'Ph4_heatmap_lig.png')
         plt.savefig(filename)
-        plt.show()
+        plt.close()
         ###################################################################################################
-        data_file = 'Ph4_3D_FMO.txt'
-        df_map_total = pd.read_csv(data_file, delimiter='\t|\s+', skipinitialspace=True)
-        df_map_total.to_csv('Ph4_report.csv', index=True, sep=',')
+        def convert_ph4_to_csv(input_file='Ph4_3D_FMO.txt', output_file='Ph4_report.csv'):
+            df = pd.read_csv(input_file, delim_whitespace=True)
+            df = df.iloc[:, :-1]
+            df.to_csv(output_file, index=False, sep=',')
+        convert_ph4_to_csv()
+
         data_file = 'Ph4_report.csv'
         with open(data_file, 'r') as file:
             lines = file.readlines()
@@ -226,7 +178,7 @@ class Analysis:
             file.writelines(lines)
         def format_fragment_name(fragment):
             residue = fragment[:3].capitalize()  
-            chain = fragment[3]  
+            chain = fragment[3] 
             number = fragment[4:]  
             return f"{residue}-{chain}-{number}"
 
@@ -249,15 +201,16 @@ class Analysis:
             'Ect+mix': 'first',
             'Edisp': 'first',
             'Gsol': 'first',
-            'Bond_type': lambda x: ', '.join({bond_type_abbreviations.get(item, item) for item in x})  
+            'Bond_type': lambda x: ', '.join({bond_type_abbreviations.get(item, item) for item in x})  # Collect all unique bond types and abbreviate
         }).reset_index()
         df_grouped['Formatted_Fragment'] = df_grouped['Fragment'].apply(format_fragment_name)
-        fig, ax = plt.subplots(figsize=(10, 6))  
+        fig, ax = plt.subplots(figsize=(10, 6))  # Reduced figure size to make the plot smaller
         bar_width = 0.7  
         df_grouped[['Ees', 'Eex', 'Ect+mix', 'Edisp', 'Gsol']].plot(
             kind='bar', stacked=True, color=('gold', 'mediumseagreen', 'firebrick', 'steelblue', 'darksalmon'), ax=ax, width=bar_width)
         plt.xticks(ticks=range(len(df_grouped)), labels=df_grouped['Formatted_Fragment'], rotation=90, ha='right', fontsize=18, fontweight='bold')
         plt.yticks(fontsize=18, fontweight='bold')
+        # ax.set_ylim(-120, 20)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fancybox=True, shadow=True, ncol=1, fontsize=14)
         plt.xlabel("Binding site residues", fontsize=18, fontweight='bold')
         plt.ylabel("kcal/mol", fontsize=18, fontweight='bold')
@@ -268,7 +221,8 @@ class Analysis:
         fig.patch.set_facecolor('white')
         ax.set_facecolor('white')
         plt.tight_layout(pad=2)
-        plt.savefig("Ph4_PIEDA_adjusted.png", dpi=300)  
+        plt.savefig("Ph4_PIEDA_adjusted.png", dpi=300) 
+        plt.close()
         ################################################
         input_file = "Ph4_report.csv"
         output_file = "Ph4_lig.pdb"
@@ -292,20 +246,15 @@ class Analysis:
         with open(output_file, "w") as file:
             file.writelines(output_lines)
         ###################################################################################################
-        if self.Binding_Energy:
-            os.remove(f'../analysis/Binding_Energy.txt')
-            os.remove(f'../analysis/complex_energy.txt')
-            os.remove(f'../analysis/protein_energy.txt')
-            os.remove(f'../analysis/ligand_energy.txt')
-            os.remove(f'../analysis/Affinity.txt')
-        os.remove(f'../analysis/PIEDA_values.txt')  
-        os.remove(f'../analysis/DA_FMO.txt')
-        os.remove(f'../analysis/FMO.txt') 
-        os.remove(f'../analysis/total_average.txt')
-        os.remove(f'Ph4_3D.txt')
+
 if __name__ == "__main__":
     """
     FMOPhore V 0.1 - Analysis - Copyright "©" 2024, Peter E.G.F. Ibrahim.
     """
-    pdb_processor = Analysis(self.pdb_file)
+    parser = argparse.ArgumentParser(description="FMOPhore Fragmention Analysis")
+    parser.add_argument("-pdb", "--pdb_file", type=str, required=True, help="Path to the PDB file")
+    parser.add_argument('-FE', '--FE_score', action='store_true', default=None, help=argparse.SUPPRESS)
+    parser.add_argument('-BE', '--Binding_Energy', action='store_true', default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    pdb_processor = Analysis(args.pdb_file, args.Binding_Energy, args.FE_score)
     pdb_processor.analyze()

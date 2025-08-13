@@ -3,6 +3,8 @@ from Bio.PDB import PDBParser
 import numpy as np
 import multiprocessing
 import argparse
+from .FMOPhore_utility import EnvironmentGuard
+# EnvironmentGuard().enforce()
 
 ###################################################################################################
 #  This part to define the distance and co-factors if any.
@@ -12,10 +14,6 @@ def distance(coord1, coord2):
 ###################################################################################################
 #  Classes
 ###################################################################################################
-excluded_residues = ['EOH', 'GZ6', 'CL','DMS', 'FMT', 
-             'PEG', 'GOL', 'BO3', 'EDO', 
-             'SO4', 'ACE', 'NMA', 'NME', 'ACT', 'MES', 
-             'OCY', 'SEP', 'TPO', 'IPA', 'TRS', ' ZN', 'ZN']
 class CutoffProcessor:
     def __init__(self, pdb_file, distance_cutoff, same_target=False):
         self.pdb_file = pdb_file
@@ -29,7 +27,7 @@ class CutoffProcessor:
             self.generate_cutoff_pdb_complex(distance_cutoff=self.distance_cutoff, ligand_info=ligand_info, same_target=True)
         else:
             self.generate_cutoff_pdb_complex(distance_cutoff=self.distance_cutoff, ligand_info=ligand_info)
-        os.chdir("..")
+        # os.chdir("..")
     def cutoff_complex(self):
         pdb_lines = self.load_pdb_file()
         ligands_list = [self.pdb_file[-13:-4]]
@@ -52,7 +50,6 @@ class CutoffProcessor:
             for chain in model:
                 for residue in chain:
                     if residue.get_resname() == "LIG":
-                    # if residue.get_resname() not in excluded_residues:
                         ligand = residue
                         ligand_chain = chain.id
                         ligand_number = residue.id[1]
@@ -136,5 +133,8 @@ if __name__ == "__main__":
     """
     FMOPhore V 0.1 - CutoffProcessor - Copyright "©" 2024, Peter E.G.F. Ibrahim.
     """
-    pdb_processor = CutoffProcessor(self.pdb_file)
+    parser = argparse.ArgumentParser(description="FMOPhore Fragmention CutoffProcessor")
+    parser.add_argument("-pdb", "--pdb_file", type=str, required=True, help="Path to the PDB file")
+    args = parser.parse_args()
+    pdb_processor = CutoffProcessor(args.pdb_file)
     pdb_processor.cutoff_complex()
