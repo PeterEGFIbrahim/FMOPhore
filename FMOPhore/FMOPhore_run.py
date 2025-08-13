@@ -54,7 +54,6 @@ mandatory_params_text = """
     -ligs       --ligand_files          : Path to single ligand PDB file or directory of ligand PDB files
 
     -qm         --qm_calculation        : MP2 or DFTB (GAMESS software required/ https://www.msg.chem.iastate.edu/gamess/download.html)
-    -FE         --FE-score              : Calculate Fragment-Efficiency Score. 
     
     -d          --distance_cutoff       : Distance cutoff for selecting residues. Use "no_cutoff" to select the whole protein.
     
