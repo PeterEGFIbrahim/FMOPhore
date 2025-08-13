@@ -967,8 +967,15 @@ def main():
             https://www.msg.chem.iastate.edu/gamess/download.html
             If you have it installed and running:
             Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
-            Contact the author Peter E.G.F. Ibrahim: 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+            Contact the author Peter E.G.F. Ibrahim: pibrahim001@dundee.ac.uk - 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
 
+        Run_QM_msge = ('''Please install GAMESS software: 
+            https://www.msg.chem.iastate.edu/gamess/download.html
+            If you have it installed and running:
+            Recommended a GPU cluster equipped with at least 2 GPUs and 20 CPU.
+            Contact the author Peter E.G.F. Ibrahim: pibrahim001@dundee.ac.uk - 2448959@dundee.ac.uk, for further details on running FMOPhore to its full potential.''')
+        with open("FMOPhore.log", "a") as log_file:
+            log_file.write(Run_QM_msge+"\n")
         # main_QM()
     else:
         pass
