@@ -58,7 +58,7 @@ To ensure all dependencies are correctly installed and avoid conflicts (Except: 
 
 ### Prerequisites
 
-- Python >= 3.6
+- Python >= 3.10
 - GAMESS software (for QM calculations).
 
 ### Steps
