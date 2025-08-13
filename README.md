@@ -76,30 +76,37 @@ To ensure all dependencies are correctly installed and avoid conflicts (Except: 
 
 ### Mandatory Parameters:
    ```bash
--dir,       --directory             : Process all PDB files in a directory.  
--com,       --Prot_complex          : Process a single complex PDB file.  
--PDB,       --PDB_ID                : Specify a PDB ID or a file containing multiple PDB IDs.  
--prot,      --protein_pdb_file      : Path to the protein PDB file.  
--ligs,      --ligand_files          : Path to a single ligand PDB file or a directory of ligand PDB files.  
--d          --distance_cutoff       : Distance cutoff for selecting residues (or "no_cutoff" for the whole protein).  
--qm         --qm_calculation        : Specify "MP2" or "DFTB" (requires GAMESS software).  
--t,         --timer                 : Timer in days (e.g., `-t 1` for 1 day).  
--c,         --cpus                  : Number of CPUs to use for parallelization.  
+    -dir,       --directory             : Process all PDB files in a directory
+    -com,       --Prot_complex          : Process a single complex PDB file .pdb
+    -pdb,       --PDB_ID                : PDB ID or .txt file containing PDB IDs.
+                                          Process a single complex PDB directly from Protein Data Bank > https://www.rcsb.org/ 
+    -prot       --protein_pdb_file      : Path to protein PDB file
+    -ligs       --ligand_files          : Path to single ligand PDB file or directory of ligand PDB files
+
+    -qm         --qm_calculation        : MP2 or DFTB (GAMESS software required/ https://www.msg.chem.iastate.edu/gamess/download.html)
+    
+    -d          --distance_cutoff       : Distance cutoff for selecting residues. Use "no_cutoff" to select the whole protein.
+    
+    -t          --timer                 : Timer in days e.g.: 1 day ==> -t 1  
+    -c          --cpus                  : Please specify the number of cpus (cores; number of jobs to parallelize)
    ```
 ### Optional Parameters:
    ```bash
--DA-FMO,    --trajectory            : Analyze trajectories (requires SuMD and ACEMD).  
--cof,       --cofactor              : Specify co-factor (e.g., `LYS-600`).  
--BE,        --Binding_Energy        : Calculate binding energy (ΔE).  
--lib,       --same_target           : Specify if analyzing the same target with different ligands.  
--align,     --align                 : Align structures if needed.  
--analysis,  --FMOPhore_analysis     : Perform analysis of completed calculations.
+    -DA-FMO,    --trajectory            : To do DA-FMO, read trajectory "traj.dcd" 
+                                        : Dy-FMOPhore requires SuMD (https://github.com/molecularmodelingsection/SuMD) 
+                                        :                      ACEMD (https://software.acellera.com/acemd/tutorial.html)
+    -cof,       --cofactor              : If you have co-factor in the system, provide the name in this form, e.g.: LYS-600'
+    -BE,        --Binding_Energy        : Calculate the Binding Energy (ΔE) = (E_Complex) − (E_Protein) − (E_Ligand)
+    -lib,       --same_target           : If same target and different ligands
+    -align,     --align                 : If needed to align structures
+    -analysis   --FMOPhore_analysis     : To run analysis only if calculations has been completed.
+    -p          --personalized          : To run personalized
    ```
 
 
 ### Example Command
    ```
-fmophore -dir /path/to/pdb/files -d 5 -qm DFTB -t 1 -c 20 -PDBProcessor -FMOPhore -lib -align
+fmophore -dir /path/to/pdb/files -d 5 -qm DFTB -t 1 -c 10 -lib
    ```
 ### Help
 To view the full list of options and their usage:
@@ -128,15 +135,19 @@ After running FMOPhore, you can expect the following outputs:
 
 The following Python libraries are required (automatically installed with the package):
 
-- `numpy`
-- `tqdm`
-- `timeout-decorator`
-- `argparse`
-
+- "numpy",
+- "tqdm",
+- "timeout-decorator",
+- "argparse",
+- "pandas",           
+- "seaborn",
+- "matplotlib",
+- "rdkit"
+  
 ### Developer Information
 
 Author: Peter E.G.F. Ibrahim  
-Email: 2448959@dundee.ac.uk, peteregfi@gmail.com  
+Email: pibrahim001@dundee.ac.uk, 2448959@dundee.ac.uk, peteregfi@gmail.com  
 GitHub: [PeterEGFIbrahim](https://github.com/PeterEGFIbrahim)  
 
 
